@@ -30,7 +30,7 @@ Handler.extensions_map.update({
 
 def open_browser():
     """Open the browser after a short delay to ensure server is ready."""
-    webbrowser.open(f"http://localhost:{PORT}/login.html")
+    webbrowser.open(f"http://localhost:{PORT}/index.html")
 
 class ReusableTCPServer(socketserver.TCPServer):
     allow_reuse_address = True

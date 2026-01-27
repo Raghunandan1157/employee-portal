@@ -882,11 +882,21 @@
         }
 
         // Check if user is already logged in on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             const storedUser = localStorage.getItem('employeeUser');
             if (storedUser) {
-                // User already logged in, redirect to reports
-                window.location.href = 'reports.html';
+                try {
+                    const userData = JSON.parse(storedUser);
+                    const employee = await checkEmployeeByEmail(userData.email);
+                    if (employee) {
+                        window.location.href = 'reports.html';
+                    } else {
+                        localStorage.removeItem('employeeUser');
+                    }
+                } catch (error) {
+                    console.error('Session verification failed:', error);
+                    localStorage.removeItem('employeeUser');
+                }
             }
         });
     </script>

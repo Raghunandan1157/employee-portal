@@ -362,7 +362,7 @@
 
             if (!storedUser) {
                 // Not logged in, redirect to login
-                window.location.href = 'login.html';
+                window.location.href = 'index.html';
                 return;
             }
 
@@ -425,7 +425,7 @@
                 console.error('Error loading profile:', error);
                 // Invalid data, redirect to login
                 localStorage.removeItem('employeeUser');
-                window.location.href = 'login.html';
+                window.location.href = 'index.html';
             }
         }
 
@@ -434,7 +434,7 @@
             // Clear session
             localStorage.removeItem('employeeUser');
             // Redirect to login
-            window.location.href = 'login.html';
+            window.location.href = 'index.html';
         }
 
         // Load profile on page load

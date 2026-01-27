@@ -57,7 +57,7 @@ Run `python3 import_data.py` to import data from CSV files.
 ```bash
 python3 server.py
 ```
-Opens automatically at http://localhost:3000/login.html
+Opens automatically at http://localhost:3000/index.html
 
 ## Login Flow
 
