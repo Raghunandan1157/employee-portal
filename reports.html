@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Employee Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .profile-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            width: 100%;
+            max-width: 480px;
+            text-align: center;
+        }
+
+        .profile-header {
+            margin-bottom: 24px;
+        }
+
+        .profile-header h1 {
+            color: #1a1a2e;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .avatar-container {
+            margin: 20px 0;
+        }
+
+        .avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #667eea;
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .avatar-initials {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: 600;
+            color: white;
+            border: 4px solid white;
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .employee-name {
+            color: #1a1a2e;
+            font-size: 26px;
+            font-weight: 600;
+            margin-top: 16px;
+            margin-bottom: 4px;
+        }
+
+        .employee-role {
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #10b981;
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .info-section {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .info-section-title {
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #1a1a2e;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .hierarchy-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 16px 0;
+            flex-wrap: wrap;
+        }
+
+        .hierarchy-item {
+            background: #f3f4f6;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #374151;
+        }
+
+        .hierarchy-arrow {
+            color: #9ca3af;
+            font-size: 12px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-logout {
+            background: #fee2e2;
+            color: #dc2626;
+            margin-top: 16px;
+        }
+
+        .btn-logout:hover {
+            background: #fecaca;
+            transform: translateY(-2px);
+        }
+
+        .btn-logout:active {
+            transform: translateY(0);
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 480px) {
+            .profile-card {
+                padding: 30px 20px;
+            }
+
+            .employee-name {
+                font-size: 22px;
+            }
+
+            .avatar, .avatar-initials {
+                width: 80px;
+                height: 80px;
+            }
+
+            .avatar-initials {
+                font-size: 28px;
+            }
+
+            .hierarchy-flow {
+                flex-direction: column;
+            }
+
+            .hierarchy-arrow {
+                transform: rotate(90deg);
+            }
+        }
+
+        /* Loading state */
+        .loading-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-state p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="profile-card">
+        <!-- Loading State -->
+        <div id="loadingState" class="loading-state">
+            <div class="loading-spinner"></div>
+            <p>Loading your profile...</p>
+        </div>
+
+        <!-- Profile Content (hidden until loaded) -->
+        <div id="profileContent" style="display: none;">
+            <div class="profile-header">
+                <h1>Employee Profile</h1>
+            </div>
+
+            <div class="status-indicator">
+                <span class="status-dot"></span>
+                <span>Active Session</span>
+            </div>
+
+            <div class="avatar-container">
+                <img id="avatarImg" class="avatar" src="" alt="Profile" style="display: none;">
+                <div id="avatarInitials" class="avatar-initials"></div>
+            </div>
+
+            <h2 id="employeeName" class="employee-name"></h2>
+            <p id="employeeRole" class="employee-role"></p>
+
+            <!-- Location Hierarchy -->
+            <div class="hierarchy-flow" id="hierarchyFlow"></div>
+
+            <!-- Employee Info Section -->
+            <div class="info-section">
+                <div class="info-section-title">Employee Details</div>
+                <div class="info-row">
+                    <span class="info-label">Employee ID</span>
+                    <span id="employeeId" class="badge"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Email</span>
+                    <span id="employeeEmail" class="info-value"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Mobile</span>
+                    <span id="employeeMobile" class="info-value"></span>
+                </div>
+            </div>
+
+            <!-- Location Info Section -->
+            <div class="info-section">
+                <div class="info-section-title">Location</div>
+                <div class="info-row">
+                    <span class="info-label">Branch</span>
+                    <span id="branchName" class="info-value"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">District</span>
+                    <span id="districtName" class="info-value"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Region</span>
+                    <span id="regionName" class="info-value"></span>
+                </div>
+            </div>
+
+            <button class="btn btn-logout" onclick="handleLogout()">
+                <svg style="width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                </svg>
+                Logout
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Get initials from name
+        function getInitials(name) {
+            if (!name) return '?';
+            const parts = name.trim().split(' ');
+            if (parts.length >= 2) {
+                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+            }
+            return name.substring(0, 2).toUpperCase();
+        }
+
+        // Load and display user profile
+        function loadProfile() {
+            const storedUser = localStorage.getItem('employeeUser');
+
+            if (!storedUser) {
+                // Not logged in, redirect to login
+                window.location.href = 'login.html';
+                return;
+            }
+
+            try {
+                const user = JSON.parse(storedUser);
+
+                // Hide loading, show content
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('profileContent').style.display = 'block';
+
+                // Set employee name and role
+                document.getElementById('employeeName').textContent = user.employee_name;
+                document.getElementById('employeeRole').textContent = user.role || 'Employee';
+
+                // Set avatar
+                if (user.picture) {
+                    const avatarImg = document.getElementById('avatarImg');
+                    avatarImg.src = user.picture;
+                    avatarImg.style.display = 'block';
+                    avatarImg.onerror = function() {
+                        this.style.display = 'none';
+                        document.getElementById('avatarInitials').style.display = 'inline-flex';
+                    };
+                    document.getElementById('avatarInitials').style.display = 'none';
+                } else {
+                    document.getElementById('avatarInitials').textContent = getInitials(user.employee_name);
+                }
+
+                // Set employee details
+                document.getElementById('employeeId').textContent = user.employee_id;
+                document.getElementById('employeeEmail').textContent = user.email || '-';
+                document.getElementById('employeeMobile').textContent = user.mobile || '-';
+
+                // Set location details
+                const branch = user.branch;
+                const district = branch?.district;
+                const region = district?.region;
+
+                document.getElementById('branchName').textContent = branch?.name || '-';
+                document.getElementById('districtName').textContent = district?.name || '-';
+                document.getElementById('regionName').textContent = region?.name || '-';
+
+                // Build hierarchy flow
+                const hierarchyFlow = document.getElementById('hierarchyFlow');
+                hierarchyFlow.innerHTML = '';
+
+                if (region?.name) {
+                    hierarchyFlow.innerHTML += `<span class="hierarchy-item">${region.name}</span>`;
+                    hierarchyFlow.innerHTML += `<span class="hierarchy-arrow">→</span>`;
+                }
+                if (district?.name) {
+                    hierarchyFlow.innerHTML += `<span class="hierarchy-item">${district.name}</span>`;
+                    hierarchyFlow.innerHTML += `<span class="hierarchy-arrow">→</span>`;
+                }
+                if (branch?.name) {
+                    hierarchyFlow.innerHTML += `<span class="hierarchy-item" style="background:#667eea;color:white;">${branch.name}</span>`;
+                }
+
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                // Invalid data, redirect to login
+                localStorage.removeItem('employeeUser');
+                window.location.href = 'login.html';
+            }
+        }
+
+        // Handle logout
+        function handleLogout() {
+            // Clear session
+            localStorage.removeItem('employeeUser');
+            // Redirect to login
+            window.location.href = 'login.html';
+        }
+
+        // Load profile on page load
+        document.addEventListener('DOMContentLoaded', loadProfile);
+    </script>
+</body>
+</html>

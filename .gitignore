@@ -1,0 +1,17 @@
+# Supabase temp files
+supabase/.temp/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Local settings
+.claude/
