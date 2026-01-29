@@ -1362,15 +1362,38 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
-            await checkAuth();
-            await loadDashboardData();
+            try {
+                console.log('Dashboard initializing...');
+                await checkAuth();
+                if (currentUser) {
+                    await loadDashboardData();
+                }
+            } catch (err) {
+                console.error('Dashboard init error:', err);
+                showToast('Error loading dashboard: ' + err.message);
+            }
         });
 
         // Check Authentication
         async function checkAuth() {
+            console.log('Checking auth...');
+            
+            // First try to get session (works better with GitHub Pages)
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            console.log('Session:', session, 'Error:', sessionError);
+            
+            if (session?.user) {
+                currentUser = session.user;
+                console.log('User from session:', currentUser.email);
+                return;
+            }
+            
+            // Fallback to getUser
             const { data: { user }, error } = await supabase.auth.getUser();
+            console.log('User from getUser:', user, 'Error:', error);
             
             if (error || !user) {
+                console.log('No user found, redirecting to login...');
                 window.location.href = 'index.html';
                 return;
             }
@@ -1381,6 +1404,8 @@
         // Load Dashboard Data
         async function loadDashboardData() {
             try {
+                console.log('Loading dashboard data for:', currentUser.email);
+                
                 // Get employee with hierarchy
                 const { data: employees, error } = await supabase
                     .from('employees')
@@ -1400,10 +1425,14 @@
                     .eq('email', currentUser.email)
                     .single();
 
+                console.log('Employee lookup result:', employees, 'Error:', error);
+
                 if (error || !employees) {
-                    // Try to find by employee_id if email not linked
-                    showToast('Please link your profile first');
-                    window.location.href = 'index.html';
+                    console.error('Employee not found:', error);
+                    showToast('Profile not found. Please link your email first.');
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 2000);
                     return;
                 }
 
