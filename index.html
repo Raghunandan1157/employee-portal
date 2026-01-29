@@ -815,7 +815,7 @@
 
             // Redirect to reports page
             setTimeout(() => {
-                window.location.href = 'reports.html';
+                window.location.href = 'dashboard.html';
             }, 2000);
         }
 
@@ -889,7 +889,7 @@
                     const userData = JSON.parse(storedUser);
                     const employee = await checkEmployeeByEmail(userData.email);
                     if (employee) {
-                        window.location.href = 'reports.html';
+                        window.location.href = 'dashboard.html';
                     } else {
                         localStorage.removeItem('employeeUser');
                     }
