@@ -14,6 +14,7 @@
   var currentDept = null;
 
   var DEPARTMENTS = ['HR','Training','Audit','Ops','IT and Admin','NMSPL'];
+  var allAttendeeNames = []; // Feature 4: attendee suggestions cache
 
   var DEPT_AGENDAS = {
     'HR': ['Employee grievances','Recruitment updates','Policy changes','Training needs','Attendance review'],
@@ -158,7 +159,7 @@
   async function createMeeting(title, date, attendees, department) {
     var dept = department || currentDept || '';
     var points = DEPT_AGENDAS[dept] ? DEPT_AGENDAS[dept].slice() : [];
-    var rec = { meeting_id:genId(), title:title, date:date, attendees:attendees, points_discussed:points, decisions:[], action_items:[], user_id:currentUser?currentUser.id:null, department:dept };
+    var rec = { meeting_id:genId(), title:title, date:date, attendees:attendees, points_discussed:points, decisions:[], action_items:[], user_id:currentUser?currentUser.id:null, department:dept, status:'draft' };
     var r = await sb.from(TABLE).insert([rec]).select().single();
     if (r.error) { toast('Error: '+r.error.message,'error'); return null; }
     toast('Meeting created!','success');
@@ -193,11 +194,12 @@
   // ---- Auto-save ----
   async function collectAndSave() {
     if (!currentMeeting||!sb) return;
+    if (currentMeeting.status==='finalized') return; // Feature 2: block saves on finalized
     var points=[]; $$('#points-list .point-input').forEach(function(el){ if(el.value.trim()) points.push(el.value.trim()); });
     var decisions=[]; $$('#decisions-list .decision-input').forEach(function(el){ if(el.value.trim()) decisions.push(el.value.trim()); });
     var actions=[]; $$('#action-items-list .action-item-row').forEach(function(row){
-      var w=row.querySelector('.action-who'), t=row.querySelector('.action-what'), d=row.querySelector('.action-deadline');
-      if(w&&t&&(w.value.trim()||t.value.trim())) actions.push({who:w.value.trim(),what:t.value.trim(),deadline:d?d.value:''});
+      var w=row.querySelector('.action-who'), t=row.querySelector('.action-what'), d=row.querySelector('.action-deadline'), cb=row.querySelector('.action-completed-cb');
+      if(w&&t&&(w.value.trim()||t.value.trim())) actions.push({who:w.value.trim(),what:t.value.trim(),deadline:d?d.value:'',completed:cb?cb.checked:false});
     });
     var f={points_discussed:points,decisions:decisions,action_items:actions};
     var ti=$('#edit-meeting-title'); if(ti&&ti.value.trim()) f.title=ti.value.trim();
@@ -232,12 +234,37 @@
         else deptCls='meeting-item-dept--'+dk;
       }
       var deptBadge = m.department ? '<span class="meeting-item-dept '+deptCls+'">'+esc(m.department)+'</span>' : '';
-      li.innerHTML='<div class="meeting-item-title">'+esc(m.title)+deptBadge+'</div><div class="meeting-item-meta">'+esc(m.meeting_id)+' &middot; '+esc(m.date)+'</div>';
+      var lockIcon = m.status==='finalized' ? '<span class="meeting-item-lock" title="Finalized" style="margin-left:6px;opacity:.6;font-size:12px;">&#128274;</span>' : '';
+      li.innerHTML='<div class="meeting-item-title">'+esc(m.title)+deptBadge+lockIcon+'</div><div class="meeting-item-meta">'+esc(m.meeting_id)+' &middot; '+esc(m.date)+'</div>';
       li.addEventListener('click',function(){ openMeeting(m.id); });
       ul.appendChild(li);
     });
   }
-  async function refreshList(){ allMeetings=await loadMeetings(); renderList(allMeetings); }
+  // Feature 6: Notification badge for overdue items
+  function updateNotificationBadge(){
+    var dashBtn=$('#my-dashboard-btn'); if(!dashBtn) return;
+    var old=dashBtn.querySelector('.notification-badge'); if(old) old.remove();
+    var today=new Date().toISOString().slice(0,10);
+    var un=userName(), ue=userEmail();
+    var overdueCount=0;
+    allMeetings.forEach(function(m){
+      (m.action_items||[]).forEach(function(a){
+        if(!a.who||a.completed) return;
+        var w=a.who.toLowerCase();
+        if(w===ue.toLowerCase()||w===un.toLowerCase()||(un&&w.includes(un.split(' ')[0].toLowerCase()))){
+          if(a.deadline&&a.deadline<today) overdueCount++;
+        }
+      });
+    });
+    if(overdueCount>0){
+      var badge=document.createElement('span');
+      badge.className='notification-badge';
+      badge.textContent=overdueCount;
+      dashBtn.appendChild(badge);
+    }
+  }
+
+  async function refreshList(){ allMeetings=await loadMeetings(); renderList(allMeetings); collectAttendeeNames(); updateNotificationBadge(); }
   function filterList(q){
     if(!q){ renderList(allMeetings); return; }
     var ql=q.toLowerCase();
@@ -247,21 +274,28 @@
   // ---- Render meeting ----
   function renderMeeting(m) {
     var el=$('#current-meeting'); if(!el||!m) return;
+    var isFinalized = m.status==='finalized';
     var att=Array.isArray(m.attendees)?m.attendees.join(', '):m.attendees||'';
     var pts=m.points_discussed||[], decs=m.decisions||[], acts=m.action_items||[];
     var h='';
 
     h+='<div class="mv-header"><div class="mv-header-left">';
-    h+='<input type="text" id="edit-meeting-title" class="mv-title-input" value="'+escA(m.title)+'" placeholder="Meeting title">';
+    h+='<input type="text" id="edit-meeting-title" class="mv-title-input" value="'+escA(m.title)+'" placeholder="Meeting title"'+(isFinalized?' readonly':'')+'>';
     h+='<span class="mv-id">'+esc(m.meeting_id)+'</span>';
+    if(isFinalized) h+='<span class="finalized-badge" style="display:inline-block;margin-left:10px;padding:2px 10px;background:#dc2626;color:#fff;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:1px;">FINALIZED</span>';
     h+='</div><div class="mv-actions">';
     h+='<button id="download-pdf-btn" class="btn btn--secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>PDF</button>';
-    h+='<button id="save-meeting-btn" class="btn btn--primary">Save</button>';
-    h+='<button id="delete-meeting-btn" class="btn btn--danger">Delete</button>';
+    if(!isFinalized){
+      h+='<button id="finalize-meeting-btn" class="btn btn--secondary" style="background:#7c3aed;color:#fff;">Finalize</button>';
+      h+='<button id="save-meeting-btn" class="btn btn--primary">Save</button>';
+      h+='<button id="delete-meeting-btn" class="btn btn--danger">Delete</button>';
+    } else {
+      h+='<button id="reopen-meeting-btn" class="btn btn--secondary" style="background:#059669;color:#fff;">Reopen</button>';
+    }
     h+='</div></div>';
 
-    h+='<div class="mv-meta"><div><strong>Date</strong> <input type="date" id="edit-meeting-date" value="'+escA(m.date||'')+'"></div>';
-    h+='<div><strong>Attendees</strong> <input type="text" id="edit-meeting-attendees" value="'+escA(att)+'" placeholder="Alice, Bob" style="min-width:220px;"></div></div>';
+    h+='<div class="mv-meta"><div><strong>Date</strong> <input type="date" id="edit-meeting-date" value="'+escA(m.date||'')+'"'+(isFinalized?' disabled':'')+'></div>';
+    h+='<div style="position:relative;"><strong>Attendees</strong> <input type="text" id="edit-meeting-attendees" value="'+escA(att)+'" placeholder="Alice, Bob" style="min-width:220px;"'+(isFinalized?' readonly':'')+'></div></div>';
 
     // Smart Notes Section
     h+='<div class="recorder-section">';
@@ -324,34 +358,42 @@
     // Points
     h+='<div class="mv-section"><div class="mv-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Points Discussed<span class="mv-section-count">'+pts.length+'</span></div>';
     h+='<div id="points-list">';
-    pts.forEach(function(p,i){ h+=rowHtml('point-input','Discussion point...',p,i); });
-    h+='</div><button type="button" class="btn-add" id="add-point-btn">+ Add Point</button></div>';
+    pts.forEach(function(p,i){ h+=rowHtml('point-input','Discussion point...',p,i,isFinalized); });
+    h+='</div>';
+    if(!isFinalized) h+='<button type="button" class="btn-add" id="add-point-btn">+ Add Point</button>';
+    h+='</div>';
 
     // Decisions
     h+='<div class="mv-section"><div class="mv-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Decisions<span class="mv-section-count">'+decs.length+'</span></div>';
     h+='<div id="decisions-list">';
-    decs.forEach(function(d,i){ h+=rowHtml('decision-input','Decision...',d,i); });
-    h+='</div><button type="button" class="btn-add" id="add-decision-btn">+ Add Decision</button></div>';
+    decs.forEach(function(d,i){ h+=rowHtml('decision-input','Decision...',d,i,isFinalized); });
+    h+='</div>';
+    if(!isFinalized) h+='<button type="button" class="btn-add" id="add-decision-btn">+ Add Decision</button>';
+    h+='</div>';
 
     // Actions
     h+='<div class="mv-section"><div class="mv-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>Action Items<span class="mv-section-count">'+acts.length+'</span></div>';
     h+='<div id="action-items-list">';
-    acts.forEach(function(a,i){ h+=actionHtml(a,i); });
-    h+='</div><button type="button" class="btn-add" id="add-action-btn">+ Add Action Item</button></div>';
+    acts.forEach(function(a,i){ h+=actionHtml(a,i,isFinalized); });
+    h+='</div>';
+    if(!isFinalized) h+='<button type="button" class="btn-add" id="add-action-btn">+ Add Action Item</button>';
+    h+='</div>';
 
-    h+='<div class="mv-footer"><button id="save-meeting-btn2" class="btn btn--primary">Save Changes</button></div>';
+    if(!isFinalized) h+='<div class="mv-footer"><button id="save-meeting-btn2" class="btn btn--primary">Save Changes</button></div>';
 
     el.innerHTML=h;
+    if(isFinalized) el.classList.add('finalized'); else el.classList.remove('finalized');
     showView('meeting');
     wireMeetingEvents();
   }
 
-  function rowHtml(cls,ph,val,i){
-    return '<div class="list-row" data-index="'+i+'"><input type="text" class="'+cls+'" placeholder="'+ph+'" value="'+escA(val)+'">'+removeBtn()+'</div>';
+  function rowHtml(cls,ph,val,i,readonly){
+    return '<div class="list-row" data-index="'+i+'"><input type="text" class="'+cls+'" placeholder="'+ph+'" value="'+escA(val)+'"'+(readonly?' readonly':'')+'>'+(readonly?'':removeBtn())+'</div>';
   }
-  function actionHtml(item,i){
+  function actionHtml(item,i,readonly){
     item=item||{};
-    return '<div class="list-row action-item-row" data-index="'+i+'"><input type="text" class="action-what" placeholder="Action item..." value="'+escA(item.what||'')+'"><input type="text" class="action-who" placeholder="Assigned to" value="'+escA(item.who||'')+'"><input type="date" class="action-deadline" value="'+escA(item.deadline||'')+'">'+removeBtn()+'</div>';
+    var checked=item.completed?'checked':'';
+    return '<div class="list-row action-item-row'+(item.completed?' action-completed':'')+'" data-index="'+i+'"><input type="checkbox" class="action-completed-cb" '+checked+' title="Mark complete"><input type="text" class="action-what" placeholder="Action item..." value="'+escA(item.what||'')+'"'+(readonly?' readonly':'')+'><input type="text" class="action-who" placeholder="Assigned to" value="'+escA(item.who||'')+'"'+(readonly?' readonly':'')+'><input type="date" class="action-deadline" value="'+escA(item.deadline||'')+'"'+(readonly?' disabled':'')+'>'+(readonly?'':removeBtn())+'</div>';
   }
   function removeBtn(){
     return '<button type="button" class="btn-remove remove-btn" title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
@@ -570,9 +612,26 @@
     var s2=$('#save-meeting-btn2'); if(s2) s2.onclick=function(e){e.preventDefault();collectAndSave();};
     var p=$('#download-pdf-btn'); if(p) p.onclick=downloadPdf;
     var d=$('#delete-meeting-btn'); if(d) d.onclick=async function(){ if(!currentMeeting||!confirm('Delete this meeting?')) return; if(await deleteMeeting(currentMeeting.id)){ currentMeeting=null; showView('empty'); await refreshList(); }};
+    // Feature 2: Finalize
+    var fb=$('#finalize-meeting-btn'); if(fb) fb.onclick=async function(){
+      if(!currentMeeting) return;
+      if(!confirm('Finalize this meeting? Editing will be locked.')) return;
+      var u=await updateMeeting(currentMeeting.id,{status:'finalized'});
+      if(u){ currentMeeting=u; renderMeeting(u); await refreshList(); toast('Meeting finalized','success'); }
+    };
+    // Feature 2: Reopen
+    var rb2=$('#reopen-meeting-btn'); if(rb2) rb2.onclick=async function(){
+      if(!currentMeeting) return;
+      var u=await updateMeeting(currentMeeting.id,{status:'draft'});
+      if(u){ currentMeeting=u; renderMeeting(u); await refreshList(); toast('Meeting reopened','success'); }
+    };
+    // Feature 1: Action item checkboxes
+    wireActionCheckboxes();
     var ap=$('#add-point-btn'); if(ap) ap.onclick=function(){ var l=$('#points-list'); if(!l) return; l.insertAdjacentHTML('beforeend',rowHtml('point-input','Discussion point...','',l.querySelectorAll('.list-row').length)); wireRemove(); wireInputs(); l.querySelector('.list-row:last-child .point-input').focus(); };
     var ad=$('#add-decision-btn'); if(ad) ad.onclick=function(){ var l=$('#decisions-list'); if(!l) return; l.insertAdjacentHTML('beforeend',rowHtml('decision-input','Decision...','',l.querySelectorAll('.list-row').length)); wireRemove(); wireInputs(); l.querySelector('.list-row:last-child .decision-input').focus(); };
-    var aa=$('#add-action-btn'); if(aa) aa.onclick=function(){ var l=$('#action-items-list'); if(!l) return; l.insertAdjacentHTML('beforeend',actionHtml({},l.querySelectorAll('.action-item-row').length)); wireRemove(); wireInputs(); l.querySelector('.action-item-row:last-child .action-what').focus(); };
+    var aa=$('#add-action-btn'); if(aa) aa.onclick=function(){ var l=$('#action-items-list'); if(!l) return; l.insertAdjacentHTML('beforeend',actionHtml({},l.querySelectorAll('.action-item-row').length)); wireRemove(); wireInputs(); wireActionCheckboxes(); l.querySelector('.action-item-row:last-child .action-what').focus(); };
+    // Feature 4: Attendee suggestions
+    wireAttendeeSuggestions($('#edit-meeting-attendees'));
     // Tab switching
     $$('.recorder-tab').forEach(function(tab){
       tab.onclick=function(){
@@ -617,6 +676,77 @@
   }
   function wireRemove(){ $$('#current-meeting .remove-btn').forEach(function(b){ b.onclick=function(){ b.closest('.list-row').remove(); schedSave(); }; }); }
   function wireInputs(){ $$('#current-meeting input').forEach(function(i){ i.oninput=schedSave; }); }
+
+  // Feature 1: Wire action item completion checkboxes
+  function wireActionCheckboxes(){
+    $$('#action-items-list .action-completed-cb').forEach(function(cb){
+      cb.onchange=function(){
+        var row=cb.closest('.action-item-row');
+        if(row){ if(cb.checked) row.classList.add('action-completed'); else row.classList.remove('action-completed'); }
+        schedSave();
+      };
+    });
+  }
+
+  // Feature 1: Toggle action item completion from dashboard
+  async function toggleDashActionComplete(meetingId, actionIdx, completed){
+    var m=await loadMeeting(meetingId); if(!m) return;
+    var acts=m.action_items||[];
+    if(acts[actionIdx]!==undefined){ acts[actionIdx].completed=completed; }
+    var u=await updateMeeting(m.id,{action_items:acts});
+    if(u){ await refreshList(); renderDashboard(); }
+  }
+
+  // Feature 4: Collect unique attendee names across all meetings
+  function collectAttendeeNames(){
+    var names={};
+    allMeetings.forEach(function(m){
+      var att=Array.isArray(m.attendees)?m.attendees:[];
+      att.forEach(function(a){ var n=a.trim(); if(n) names[n.toLowerCase()]=n; });
+    });
+    allAttendeeNames=Object.values(names);
+  }
+
+  // Feature 4: Attendee autocomplete
+  function wireAttendeeSuggestions(input){
+    if(!input) return;
+    input.addEventListener('input',function(){
+      removeAttendeeSuggestions();
+      var val=input.value;
+      var lastComma=val.lastIndexOf(',');
+      var query=(lastComma>=0?val.substring(lastComma+1):val).trim().toLowerCase();
+      if(!query||query.length<1) return;
+      var matches=allAttendeeNames.filter(function(n){ return n.toLowerCase().includes(query); }).slice(0,8);
+      if(!matches.length) return;
+      var dd=document.createElement('div');
+      dd.className='attendee-suggestions';
+      dd.style.cssText='position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--bg-card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:180px;overflow-y:auto;';
+      matches.forEach(function(name){
+        var item=document.createElement('div');
+        item.className='attendee-suggestion-item';
+        item.textContent=name;
+        item.style.cssText='padding:8px 12px;cursor:pointer;font-size:14px;';
+        item.addEventListener('mousedown',function(e){
+          e.preventDefault();
+          var before=lastComma>=0?val.substring(0,lastComma+1)+' ':'' ;
+          input.value=before+name+', ';
+          removeAttendeeSuggestions();
+          input.focus();
+          schedSave();
+        });
+        item.addEventListener('mouseenter',function(){ item.style.background='var(--bg-hover,#f1f5f9)'; });
+        item.addEventListener('mouseleave',function(){ item.style.background=''; });
+        dd.appendChild(item);
+      });
+      input.parentElement.style.position='relative';
+      input.parentElement.appendChild(dd);
+    });
+    input.addEventListener('blur',function(){ setTimeout(removeAttendeeSuggestions,200); });
+  }
+  function removeAttendeeSuggestions(){
+    var existing=document.querySelectorAll('.attendee-suggestions');
+    existing.forEach(function(el){ el.remove(); });
+  }
 
   async function openMeeting(id){
     var m=await loadMeeting(id); if(!m) return;
@@ -682,6 +812,7 @@
     // Header
     h+='<div class="dash-header">';
     h+='<div class="dash-header-text"><h2>My Dashboard</h2><p>Welcome back, '+esc(un||ue)+'</p></div>';
+    h+='<div class="dash-header-actions"><button id="export-dept-pdf-btn" class="btn btn--secondary">Export Department Report</button></div>';
     h+='</div>';
 
     // Stats grid
@@ -716,10 +847,13 @@
     // All Action Items
     h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>All My Action Items ('+myActions.length+')</h3>';
     if(!myActions.length) h+='<p class="empty-dash-msg">No action items assigned to you.</p>';
-    else myActions.forEach(function(e){
+    else myActions.forEach(function(e,idx){
       var a=e.action, m=e.meeting, bc='future', bt=a.deadline||'No deadline';
       if(a.deadline){ if(a.deadline<today){bc='overdue';bt='Overdue: '+a.deadline;} else if(a.deadline<=threeDays){bc='upcoming';bt='Due: '+a.deadline;} else bt='Due: '+a.deadline; }
-      h+='<div class="dash-card" data-meeting-id="'+m.id+'"><div class="action-item-card"><div class="action-details"><div class="action-task-text">'+esc(a.what)+'</div><div class="action-from-meeting">From: '+esc(m.title)+' &middot; '+esc(m.meeting_id)+'</div></div><span class="deadline-badge '+bc+'">'+esc(bt)+'</span></div></div>';
+      var aIdx=(m.action_items||[]).indexOf(a);
+      var checked=a.completed?'checked':'';
+      var completedCls=a.completed?' action-completed':'';
+      h+='<div class="dash-card'+completedCls+'" data-meeting-id="'+m.id+'"><div class="action-item-card"><input type="checkbox" class="action-check dash-action-cb" data-mid="'+m.id+'" data-aidx="'+aIdx+'" '+checked+' title="Mark complete"><div class="action-details"><div class="action-task-text">'+esc(a.what)+'</div><div class="action-from-meeting">From: '+esc(m.title)+' &middot; '+esc(m.meeting_id)+'</div></div><span class="deadline-badge '+bc+'">'+esc(bt)+'</span></div></div>';
     });
     h+='</div>';
 
@@ -775,7 +909,15 @@
     h+='</div>';
 
     el.innerHTML=h; showView('dashboard');
-    el.querySelectorAll('[data-meeting-id]').forEach(function(c){ c.addEventListener('click',function(){ openMeeting(parseInt(c.dataset.meetingId)); }); });
+    // Wire export button
+    var expBtn=$('#export-dept-pdf-btn'); if(expBtn) expBtn.onclick=downloadDeptReport;
+    // Wire dashboard action checkboxes
+    el.querySelectorAll('.dash-action-cb').forEach(function(cb){
+      cb.onclick=function(e){ e.stopPropagation(); toggleDashActionComplete(parseInt(cb.dataset.mid),parseInt(cb.dataset.aidx),cb.checked); };
+    });
+    el.querySelectorAll('[data-meeting-id]').forEach(function(c){
+      if(!c.querySelector('.dash-action-cb')) c.addEventListener('click',function(){ openMeeting(parseInt(c.dataset.meetingId)); });
+    });
   }
 
   // ---- Modal ----
@@ -843,6 +985,90 @@
   }
   function closeModal(){ var o=$('#meeting-modal-overlay'); if(o) o.style.display='none'; }
 
+  // Feature 5: Dark mode toggle
+  function initDarkMode(){
+    var saved=localStorage.getItem('meeting_dark_mode');
+    if(saved==='true') document.documentElement.classList.add('dark');
+    // Inject toggle button into topbar-right
+    var topRight=$('.topbar-right');
+    if(!topRight) return;
+    var btn=document.createElement('button');
+    btn.className='dark-mode-toggle';
+    btn.title='Toggle dark mode';
+    btn.innerHTML=document.documentElement.classList.contains('dark')
+      ?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+      :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    btn.onclick=function(){
+      var isDark=document.documentElement.classList.toggle('dark');
+      localStorage.setItem('meeting_dark_mode',isDark?'true':'false');
+      btn.innerHTML=isDark
+        ?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+        :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    };
+    topRight.insertBefore(btn,topRight.firstChild);
+  }
+
+  // Feature 3: Export department PDF report
+  function downloadDeptReport(){
+    var J=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+    if(!J){ toast('jsPDF not loaded','error'); return; }
+    var dept=currentDept||'All';
+    var meetings=dept==='Higher Authority'?allMeetings:allMeetings.filter(function(m){ return m.department===dept; });
+    if(!meetings.length){ toast('No meetings to export','error'); return; }
+    meetings.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+
+    var doc=new J(), y=20, mg=20, pw=doc.internal.pageSize.getWidth(), mw=pw-mg*2;
+    function chk(n){ if(y+n>270){ doc.addPage(); y=20; } }
+
+    // Title page
+    doc.setFontSize(22); doc.setFont(undefined,'bold');
+    doc.text(dept+' — Meeting Minutes Report',mg,y); y+=10;
+    doc.setFontSize(11); doc.setFont(undefined,'normal');
+    doc.text('Generated: '+new Date().toLocaleDateString(),mg,y); y+=6;
+    doc.text('Total meetings: '+meetings.length,mg,y); y+=10;
+    doc.setDrawColor(180); doc.line(mg,y,pw-mg,y); y+=10;
+
+    meetings.forEach(function(m,idx){
+      chk(30);
+      doc.setFontSize(15); doc.setFont(undefined,'bold');
+      doc.text((idx+1)+'. '+esc(m.title||'Untitled').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"'),mg,y); y+=7;
+      doc.setFontSize(10); doc.setFont(undefined,'normal');
+      doc.text('ID: '+(m.meeting_id||'N/A')+'  |  Date: '+(m.date||'N/A')+'  |  Status: '+(m.status||'draft'),mg,y); y+=5;
+      var att=Array.isArray(m.attendees)?m.attendees.join(', '):m.attendees||'';
+      if(att){ doc.text('Attendees: '+att,mg,y,{maxWidth:mw}); y+=6; }
+      y+=3;
+
+      // Points
+      var pts=m.points_discussed||[];
+      if(pts.length){
+        doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.text('Points Discussed:',mg,y); y+=6;
+        doc.setFontSize(10); doc.setFont(undefined,'normal');
+        pts.forEach(function(p,i){ chk(7); var l=doc.splitTextToSize('  '+(i+1)+'. '+p,mw); doc.text(l,mg,y); y+=l.length*5; });
+        y+=3;
+      }
+      // Decisions
+      var decs=m.decisions||[];
+      if(decs.length){
+        chk(10); doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.text('Decisions:',mg,y); y+=6;
+        doc.setFontSize(10); doc.setFont(undefined,'normal');
+        decs.forEach(function(d,i){ chk(7); var l=doc.splitTextToSize('  '+(i+1)+'. '+d,mw); doc.text(l,mg,y); y+=l.length*5; });
+        y+=3;
+      }
+      // Actions
+      var acts=m.action_items||[];
+      if(acts.length){
+        chk(10); doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.text('Action Items:',mg,y); y+=6;
+        doc.setFontSize(10); doc.setFont(undefined,'normal');
+        acts.forEach(function(a,i){ chk(7); var ln='  '+(i+1)+'. ['+(a.who||'?')+'] '+(a.what||'')+(a.deadline?' (Due: '+a.deadline+')':'')+(a.completed?' [DONE]':''); var l=doc.splitTextToSize(ln,mw); doc.text(l,mg,y); y+=l.length*5; });
+        y+=3;
+      }
+      y+=6; chk(6); doc.setDrawColor(220); doc.line(mg,y,pw-mg,y); y+=8;
+    });
+
+    doc.save(dept.replace(/\s+/g,'_')+'_report.pdf');
+    toast('Department report downloaded','success');
+  }
+
   // ---- Init ----
   function wireStatic(){
     // Auth
@@ -892,6 +1118,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function(){
+    initDarkMode();
     wireStatic();
 
     // Auto-connect

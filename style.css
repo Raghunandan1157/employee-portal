@@ -943,6 +943,39 @@ body {
 }
 .form-select:focus { outline:none; border-color:var(--pri); box-shadow:0 0 0 3px var(--pri-light); }
 
+/* ---- Action Item Completion ---- */
+.action-check { width:16px; height:16px; accent-color:var(--pri); cursor:pointer; flex-shrink:0; margin-right:4px; }
+.action-completed { text-decoration:line-through; opacity:.5; }
+.action-completed .action-task-text { text-decoration:line-through; color:var(--text-3); }
+.action-completed .deadline-badge { opacity:.4; }
+.action-item-row { grid-template-columns:30px 1fr 130px 130px 30px; }
+
+/* ---- Finalized Meeting ---- */
+.mv-finalized-badge { display:inline-block; margin-left:8px; padding:4px 12px; font-size:.6rem; font-weight:700; letter-spacing:.05em; background:var(--green); color:#fff; border-radius:100px; text-transform:uppercase; vertical-align:middle; }
+.meeting-view.finalized input, .meeting-view.finalized textarea { color:var(--text-3); pointer-events:none; }
+.meeting-view.finalized .btn-add, .meeting-view.finalized .btn-remove { display:none; }
+.meeting-view.finalized .recorder-section { display:none; }
+.meeting-item-finalized { font-size:.5625rem; color:var(--green); margin-left:4px; }
+.btn--success { background:var(--green); color:#fff; box-shadow:0 2px 8px rgba(16,185,129,.25); }
+.btn--success:hover { background:#059669; transform:translateY(-1px); box-shadow:0 4px 14px rgba(16,185,129,.3); }
+
+/* ---- Attendee Suggestions ---- */
+.attendee-suggestions-wrap { position:relative; }
+.attendee-suggestions { position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-sm); box-shadow:var(--shadow-md); max-height:160px; overflow-y:auto; z-index:50; margin-top:2px; }
+.attendee-suggestion-item { padding:8px 14px; font-size:.8125rem; cursor:pointer; transition:background .15s; }
+.attendee-suggestion-item:hover { background:var(--bg-subtle); }
+
+/* ---- Dark Mode Toggle ---- */
+.dark-mode-toggle { width:36px; height:36px; border-radius:var(--r-sm); display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer; color:var(--text-2); transition:all .2s var(--ease); }
+.dark-mode-toggle:hover { background:var(--bg-subtle); color:var(--text); }
+.dark-mode-toggle svg { width:18px; height:18px; }
+
+/* ---- Notification Badge ---- */
+.topbar-link { position:relative; }
+.notification-badge { position:absolute; top:-2px; right:-2px; min-width:16px; height:16px; border-radius:100px; background:var(--red); color:#fff; font-size:.5625rem; font-weight:700; display:flex; align-items:center; justify-content:center; padding:0 4px; box-shadow:0 0 0 2px var(--surface); animation:badge-pulse 2s ease-in-out infinite; }
+.notification-badge:empty { display:none; }
+@keyframes badge-pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.1); } }
+
 /* ---- Responsive ---- */
 @media (max-width:900px) {
   .main-content { padding:24px 20px; }
@@ -978,3 +1011,52 @@ body {
   .main-content { padding:0; }
   .meeting-view { animation:none; }
 }
+
+/* ---- Dark Mode Theme ---- */
+html.dark {
+  --text: #e2e8f0;
+  --text-2: #94a3b8;
+  --text-3: #64748b;
+  --text-4: #475569;
+  --bg: #0f172a;
+  --bg-subtle: #1e293b;
+  --surface: #1e293b;
+  --surface-raised: #334155;
+  --border: #334155;
+  --border-2: #1e293b;
+  --border-subtle: rgba(255,255,255,.06);
+  --glass-bg: rgba(30,41,59,.8);
+  --glass-border: rgba(255,255,255,.08);
+  --pri-light: rgba(99,102,241,.2);
+  --pri-bg: rgba(99,102,241,.1);
+  --green-light: rgba(16,185,129,.2);
+  --red-light: rgba(239,68,68,.15);
+  --amber-light: rgba(245,158,11,.15);
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.2);
+  --shadow: 0 1px 3px rgba(0,0,0,.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.3);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.4);
+  --shadow-xl: 0 20px 60px rgba(0,0,0,.5);
+  --shadow-glow: 0 0 20px rgba(99,102,241,.2);
+  color-scheme: dark;
+}
+html.dark .login-card, html.dark .modal, html.dark .dept-modal { background:var(--surface-raised); }
+html.dark .login-card::before, html.dark .login-card::after { opacity:.1; }
+html.dark input, html.dark select, html.dark textarea { background:var(--bg); color:var(--text); border-color:var(--border); }
+html.dark input:focus, html.dark select:focus, html.dark textarea:focus { border-color:var(--pri); }
+html.dark .meeting-item.active { background:rgba(99,102,241,.15); }
+html.dark .dept-card { background:var(--bg); border-color:var(--border); }
+html.dark .dept-card:hover { border-color:rgba(99,102,241,.4); }
+html.dark .dept-card--authority { background:rgba(245,158,11,.05); }
+html.dark .btn-google { background:var(--bg); color:var(--text); border-color:var(--border); }
+html.dark .btn--secondary { background:var(--bg); color:var(--text-2); border-color:var(--border); }
+html.dark .mv-title-input { color:var(--text); }
+html.dark .mv-title-input:focus { color:#a5b4fc; }
+html.dark ::selection { background:rgba(99,102,241,.3); color:#e2e8f0; }
+html.dark .dash-card, html.dark .dash-note-card, html.dark .dash-meeting-card, html.dark .dash-stat-card { background:var(--bg); }
+html.dark .list-row { background:var(--bg); }
+html.dark .recorder-section { background:var(--bg); }
+html.dark .transcript-panel { background:var(--surface); }
+html.dark .extracted-card { background:var(--bg); }
+html.dark .attendee-suggestions { background:var(--surface-raised); }
+html.dark .notes-textarea { background:var(--bg); }
