@@ -1,904 +1,120 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Employee Portal</title>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- Supabase Client -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .login-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-            padding: 40px;
-            width: 100%;
-            max-width: 400px;
-        }
-
-        .login-header {
-            text-align: center;
-            margin-bottom: 32px;
-        }
-
-        .login-header h1 {
-            color: #1a1a2e;
-            font-size: 28px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .login-header p {
-            color: #6b7280;
-            font-size: 14px;
-        }
-
-        .error-message {
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            color: #dc2626;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-size: 14px;
-            margin-bottom: 20px;
-            display: none;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .error-message.show {
-            display: flex;
-        }
-
-        .error-icon {
-            width: 20px;
-            height: 20px;
-            flex-shrink: 0;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            margin-bottom: 12px;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-primary:active {
-            transform: translateY(0);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* Google Sign-In button container */
-        .google-signin-container {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 12px;
-        }
-
-        .google-signin-container > div {
-            width: 100% !important;
-        }
-
-        /* Employee Selection Dropdown */
-        .employee-selection {
-            display: none;
-            margin-top: 20px;
-        }
-
-        .employee-selection.show {
-            display: block;
-        }
-
-        .employee-selection h3 {
-            color: #1a1a2e;
-            font-size: 18px;
-            margin-bottom: 12px;
-            text-align: center;
-        }
-
-        .employee-selection p {
-            color: #6b7280;
-            font-size: 13px;
-            text-align: center;
-            margin-bottom: 16px;
-        }
-
-        .employee-dropdown {
-            width: 100%;
-            padding: 14px 16px;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 15px;
-            background: white;
-            cursor: pointer;
-            margin-bottom: 16px;
-            outline: none;
-            transition: all 0.2s ease;
-        }
-
-        .employee-dropdown:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
-        }
-
-        /* Search Method Buttons */
-        .search-method-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin: 20px 0;
-        }
-
-        .search-method-btn {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 16px 20px;
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 15px;
-            font-weight: 500;
-            color: #374151;
-        }
-
-        .search-method-btn:hover {
-            border-color: #667eea;
-            background: #f8f7ff;
-        }
-
-        .search-icon {
-            font-size: 24px;
-        }
-
-        /* Search Input Section */
-        .search-back {
-            text-align: left;
-            color: #667eea;
-            cursor: pointer;
-            font-size: 14px;
-            margin-bottom: 16px;
-        }
-
-        .search-back:hover {
-            text-decoration: underline;
-        }
-
-        .search-label {
-            display: block;
-            text-align: left;
-            font-size: 14px;
-            font-weight: 500;
-            color: #374151;
-            margin-bottom: 8px;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 16px;
-            outline: none;
-            transition: all 0.2s ease;
-        }
-
-        .search-input:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
-        }
-
-        /* Search Results */
-        .search-results {
-            margin-top: 16px;
-            max-height: 250px;
-            overflow-y: auto;
-        }
-
-        .search-result-item {
-            padding: 14px 16px;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            margin-bottom: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-align: left;
-        }
-
-        .search-result-item:hover {
-            border-color: #667eea;
-            background: #f8f7ff;
-        }
-
-        .search-result-item.selected {
-            border-color: #667eea;
-            background: #667eea;
-            color: white;
-        }
-
-        .search-result-name {
-            font-weight: 600;
-            font-size: 15px;
-        }
-
-        .search-result-details {
-            font-size: 12px;
-            color: #6b7280;
-            margin-top: 4px;
-        }
-
-        .search-result-item.selected .search-result-details {
-            color: rgba(255,255,255,0.8);
-        }
-
-        .no-results {
-            text-align: center;
-            color: #6b7280;
-            padding: 20px;
-            font-size: 14px;
-        }
-
-        .user-info {
-            text-align: center;
-            padding: 16px;
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 10px;
-            margin-bottom: 16px;
-        }
-
-        .user-info img {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            margin-bottom: 10px;
-        }
-
-        .user-info h3 {
-            color: #166534;
-            font-size: 16px;
-            margin-bottom: 4px;
-        }
-
-        .user-info p {
-            color: #15803d;
-            font-size: 13px;
-        }
-
-        /* Success animation */
-        .success-checkmark {
-            display: none;
-            text-align: center;
-            padding: 20px;
-        }
-
-        .success-checkmark svg {
-            width: 80px;
-            height: 80px;
-            color: #10b981;
-        }
-
-        .success-checkmark h2 {
-            color: #1a1a2e;
-            margin-top: 16px;
-            font-size: 20px;
-        }
-
-        /* Loading state */
-        .btn-primary.loading {
-            pointer-events: none;
-            opacity: 0.8;
-        }
-
-        .btn-primary.loading::after {
-            content: '';
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid transparent;
-            border-top-color: white;
-            border-radius: 50%;
-            margin-left: 10px;
-            animation: spin 0.8s linear infinite;
-            vertical-align: middle;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Mobile responsive */
-        @media (max-width: 480px) {
-            .login-card {
-                padding: 30px 24px;
-            }
-
-            .login-header h1 {
-                font-size: 24px;
-            }
-
-            .btn {
-                padding: 12px 14px;
-            }
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-            20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Minutes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
 </head>
 <body>
-    <div class="login-card">
-        <div id="loginForm">
-            <div class="login-header">
-                <h1>Employee Portal</h1>
-                <p>Sign in with your Google account</p>
-            </div>
 
-            <div class="error-message" id="errorMessage">
-                <svg class="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span id="errorText">An error occurred. Please try again.</span>
-            </div>
-
-            <!-- Google Sign-In Button -->
-            <div class="google-signin-container" id="googleSignInContainer">
-                <div id="g_id_onload"
-                    data-client_id="828442976315-29947njoflscn4u45rn6en4upa48aa52.apps.googleusercontent.com"
-                    data-context="signin"
-                    data-ux_mode="popup"
-                    data-callback="handleGoogleSignIn"
-                    data-auto_prompt="false">
-                </div>
-                <div class="g_id_signin"
-                    data-type="standard"
-                    data-shape="rectangular"
-                    data-theme="outline"
-                    data-text="signin_with"
-                    data-size="large"
-                    data-logo_alignment="left"
-                    data-width="352">
-                </div>
-            </div>
-
-            <!-- Employee Selection (hidden by default) -->
-            <div class="employee-selection" id="employeeSelection">
-                <div class="user-info" id="googleUserInfo"></div>
-                <h3>Find Your Profile</h3>
-                <p>This is your first login. How would you like to search?</p>
-
-                <!-- Search Method Selection -->
-                <div id="searchMethodSelection" class="search-method-buttons">
-                    <button class="search-method-btn" onclick="selectSearchMethod('employee_id')">
-                        <span class="search-icon">🆔</span>
-                        <span>Employee ID</span>
-                    </button>
-                    <button class="search-method-btn" onclick="selectSearchMethod('mobile')">
-                        <span class="search-icon">📱</span>
-                        <span>Mobile Number</span>
-                    </button>
-                    <button class="search-method-btn" onclick="selectSearchMethod('name')">
-                        <span class="search-icon">👤</span>
-                        <span>Name</span>
-                    </button>
-                </div>
-
-                <!-- Search Input (hidden until method selected) -->
-                <div id="searchInputSection" style="display: none;">
-                    <div class="search-back" onclick="goBackToMethodSelection()">← Back</div>
-                    <label id="searchLabel" class="search-label">Search</label>
-                    <input type="text" id="searchInput" class="search-input" placeholder="Enter value..." oninput="performSearch()">
-                    <div id="searchResults" class="search-results"></div>
-                </div>
-
-                <button class="btn btn-primary" id="confirmBtn" onclick="confirmSelection()" style="display: none;" disabled>
-                    Confirm Selection
-                </button>
-            </div>
+  <!-- Supabase Connection Banner -->
+  <div id="connection-banner" class="connection-banner">
+    <div class="connection-inner">
+      <span class="connection-label">Supabase</span>
+      <input type="text" id="supabase-url" placeholder="Project URL" class="connection-input" value="https://tndwzftilgkhzxseiszj.supabase.co">
+      <input type="text" id="supabase-key" placeholder="Anon Key" class="connection-input connection-input--key" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHd6ZnRpbGdraHp4c2Vpc3pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyMjcwOTIsImV4cCI6MjA4NDgwMzA5Mn0.AZC2RWDl-Pq43AWRD5UE-C_uR9ada3hcC2xWr5ix5ao">
+      <button id="connect-btn" class="btn btn--connect">Connect</button>
+      <span id="connection-status" class="connection-status">Not connected</span>
+      <div class="connection-spacer"></div>
+      <!-- Auth Section -->
+      <div id="auth-section" class="auth-section" style="display:none;">
+        <button id="google-login-btn" class="btn btn--google">
+          <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.6 33.4 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.7 29.2 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.2-2.7-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.5 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.7 29.2 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5 0 9.6-1.6 13.2-4.4l-6.1-5.2C29 36 26.6 36.8 24 36.8c-5.2 0-9.6-3.4-11.2-8l-6.5 5C9.5 40 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.1 5.2C36.6 39.4 44 34 44 24c0-1.3-.2-2.7-.4-3.9z"/></svg>
+          Sign in with Google
+        </button>
+        <div id="user-profile" class="user-profile" style="display:none;">
+          <img id="user-avatar" class="user-avatar" src="" alt="avatar">
+          <span id="user-name" class="user-name"></span>
+          <button id="my-dashboard-btn" class="btn btn--ghost btn--sm">My Tasks</button>
+          <button id="logout-btn" class="btn btn--outline btn--sm">Logout</button>
         </div>
-
-        <div class="success-checkmark" id="successMessage">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <h2>Login Successful!</h2>
-        </div>
+      </div>
     </div>
+  </div>
+
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h1 class="logo">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Minutes
+        </h1>
+        <button id="new-meeting-btn" class="btn btn--primary btn--new-meeting">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Meeting
+        </button>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" id="search-meetings" placeholder="Search meetings..." class="search-input">
+      </div>
+      <nav class="meetings-nav">
+        <ul id="meetings-list" class="meetings-list">
+          <li class="meetings-list__empty">Connect to Supabase to get started.</li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Empty State -->
+      <div id="empty-state" class="empty-state">
+        <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <h2>No meeting selected</h2>
+        <p>Select a meeting from the sidebar or create a new one.</p>
+      </div>
+
+      <!-- Current Meeting View (dynamically rendered by JS) -->
+      <div id="current-meeting" class="meeting-view" style="display:none;"></div>
+
+      <!-- My Dashboard View -->
+      <div id="dashboard-view" class="dashboard-view" style="display:none;"></div>
+    </main>
+  </div>
+
+  <!-- New Meeting Modal Overlay -->
+  <div id="meeting-modal-overlay" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>New Meeting</h2>
+        <button id="modal-close-btn" class="btn-icon" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="meeting-form" class="modal-form" autocomplete="off">
+        <div class="form-group">
+          <label for="meeting-title" class="field-label">Meeting Title</label>
+          <input type="text" id="meeting-title" class="field-input field-input--full" placeholder="e.g. Sprint Planning" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="meeting-date" class="field-label">Date</label>
+            <input type="date" id="meeting-date" class="field-input" required>
+          </div>
+          <div class="form-group form-group--grow">
+            <label for="meeting-attendees" class="field-label">Attendees</label>
+            <input type="text" id="meeting-attendees" class="field-input field-input--full" placeholder="Alice, Bob, Carol">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="modal-cancel-btn" class="btn btn--outline">Cancel</button>
+          <button type="submit" class="btn btn--primary">Create Meeting</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Mobile Sidebar Toggle -->
+  <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
 
-    <script>
-        // Supabase Configuration
-        const SUPABASE_URL = 'https://tndwzftilgkhzxseiszj.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHd6ZnRpbGdraHp4c2Vpc3pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyMjcwOTIsImV4cCI6MjA4NDgwMzA5Mn0.AZC2RWDl-Pq43AWRD5UE-C_uR9ada3hcC2xWr5ix5ao';
-
-        // Initialize Supabase client
-        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log('Supabase initialized successfully');
-
-        // Store Google user data temporarily during selection flow
-        let pendingGoogleUser = null;
-        let allEmployees = [];
-        let selectedEmployee = null;
-        let currentSearchMethod = null;
-
-        // Search method configuration
-        const searchMethods = {
-            employee_id: {
-                label: 'Enter your Employee ID',
-                placeholder: 'e.g., NM1234',
-                field: 'employee_id'
-            },
-            mobile: {
-                label: 'Enter your Mobile Number',
-                placeholder: 'e.g., 9876543210',
-                field: 'mobile'
-            },
-            name: {
-                label: 'Enter your Name',
-                placeholder: 'e.g., Rajesh Kumar',
-                field: 'employee_name'
-            }
-        };
-
-        // Select search method
-        function selectSearchMethod(method) {
-            currentSearchMethod = method;
-            const config = searchMethods[method];
-
-            document.getElementById('searchMethodSelection').style.display = 'none';
-            document.getElementById('searchInputSection').style.display = 'block';
-            document.getElementById('searchLabel').textContent = config.label;
-            document.getElementById('searchInput').placeholder = config.placeholder;
-            document.getElementById('searchInput').value = '';
-            document.getElementById('searchResults').innerHTML = '';
-            document.getElementById('confirmBtn').style.display = 'none';
-            selectedEmployee = null;
-
-            document.getElementById('searchInput').focus();
-        }
-
-        // Go back to method selection
-        function goBackToMethodSelection() {
-            document.getElementById('searchMethodSelection').style.display = 'flex';
-            document.getElementById('searchInputSection').style.display = 'none';
-            document.getElementById('confirmBtn').style.display = 'none';
-            currentSearchMethod = null;
-            selectedEmployee = null;
-        }
-
-        // Perform search
-        function performSearch() {
-            const query = document.getElementById('searchInput').value.trim().toLowerCase();
-            const resultsContainer = document.getElementById('searchResults');
-
-            if (query.length < 2) {
-                resultsContainer.innerHTML = '<div class="no-results">Type at least 2 characters to search</div>';
-                document.getElementById('confirmBtn').style.display = 'none';
-                selectedEmployee = null;
-                return;
-            }
-
-            const field = searchMethods[currentSearchMethod].field;
-
-            const matches = allEmployees.filter(emp => {
-                let value = String(emp[field] || '').toLowerCase();
-
-                // For mobile search, also try without 91 prefix
-                if (currentSearchMethod === 'mobile') {
-                    // Remove 91 prefix if present for comparison
-                    const normalizedValue = value.startsWith('91') ? value.slice(2) : value;
-                    const normalizedQuery = query.startsWith('91') ? query.slice(2) : query;
-
-                    // Match if query found in original OR normalized value
-                    return value.includes(query) ||
-                           normalizedValue.includes(query) ||
-                           value.includes(normalizedQuery) ||
-                           normalizedValue.includes(normalizedQuery);
-                }
-
-                return value.includes(query);
-            }).slice(0, 10); // Limit to 10 results
-
-            if (matches.length === 0) {
-                resultsContainer.innerHTML = '<div class="no-results">No employees found</div>';
-                document.getElementById('confirmBtn').style.display = 'none';
-                selectedEmployee = null;
-                return;
-            }
-
-            resultsContainer.innerHTML = matches.map(emp => {
-                const branchName = emp.branch ? emp.branch.name : 'No Branch';
-                return `
-                    <div class="search-result-item" onclick="selectEmployee('${emp.id}')">
-                        <div class="search-result-name">${emp.employee_name}</div>
-                        <div class="search-result-details">${emp.employee_id} | ${emp.role || 'N/A'} | ${branchName}</div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // Select employee from results
-        function selectEmployee(employeeId) {
-            selectedEmployee = allEmployees.find(e => e.id === employeeId);
-
-            // Update UI
-            document.querySelectorAll('.search-result-item').forEach(item => {
-                item.classList.remove('selected');
-            });
-            event.currentTarget.classList.add('selected');
-
-            // Show confirm button
-            document.getElementById('confirmBtn').style.display = 'block';
-            document.getElementById('confirmBtn').disabled = false;
-        }
-
-        // Check if employee exists by email
-        async function checkEmployeeByEmail(email) {
-            const { data, error } = await db
-                .from('employees')
-                .select(`
-                    *,
-                    branch:branch_id (
-                        id,
-                        name,
-                        district:district_id (
-                            id,
-                            name,
-                            region:region_id (
-                                id,
-                                name
-                            )
-                        )
-                    )
-                `)
-                .eq('email', email)
-                .single();
-
-            if (error && error.code !== 'PGRST116') {
-                console.error('Error checking employee:', error);
-                throw error;
-            }
-
-            return data; // Returns employee or null
-        }
-
-        // Get all employees without an email (unclaimed profiles)
-        async function getUnclaimedEmployees() {
-            const { data, error } = await db
-                .from('employees')
-                .select(`
-                    *,
-                    branch:branch_id (
-                        id,
-                        name,
-                        district:district_id (
-                            id,
-                            name,
-                            region:region_id (
-                                id,
-                                name
-                            )
-                        )
-                    )
-                `)
-                .is('email', null)
-                .order('employee_name');
-
-            if (error) {
-                console.error('Error fetching unclaimed employees:', error);
-                throw error;
-            }
-
-            return data || [];
-        }
-
-        // Claim an employee profile by saving email
-        async function claimEmployeeProfile(employeeId, email) {
-            // First update the email
-            const { error: updateError } = await db
-                .from('employees')
-                .update({ email: email })
-                .eq('id', employeeId);
-
-            if (updateError) {
-                console.error('Error claiming profile:', updateError);
-                throw updateError;
-            }
-
-            // Then fetch the complete data with relationships
-            const { data, error } = await db
-                .from('employees')
-                .select(`
-                    *,
-                    branch:branch_id (
-                        id,
-                        name,
-                        district:district_id (
-                            id,
-                            name,
-                            region:region_id (
-                                id,
-                                name
-                            )
-                        )
-                    )
-                `)
-                .eq('id', employeeId)
-                .single();
-
-            if (error) {
-                console.error('Error fetching claimed profile:', error);
-                throw error;
-            }
-
-            return data;
-        }
-
-        // Decode JWT payload
-        function decodeJwtPayload(token) {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-            return JSON.parse(jsonPayload);
-        }
-
-        // Show error message
-        function showError(message) {
-            const errorMessage = document.getElementById('errorMessage');
-            const errorText = document.getElementById('errorText');
-            errorText.textContent = message;
-            errorMessage.classList.add('show');
-        }
-
-        // Hide error message
-        function hideError() {
-            document.getElementById('errorMessage').classList.remove('show');
-        }
-
-        // Show employee selection
-        async function showEmployeeSelection(googleUser) {
-            console.log('showEmployeeSelection called with:', googleUser);
-            pendingGoogleUser = googleUser;
-
-            // Display Google user info
-            const userInfo = document.getElementById('googleUserInfo');
-            userInfo.innerHTML = `
-                <img src="${googleUser.picture}" alt="Profile" onerror="this.style.display='none'">
-                <h3>${googleUser.name}</h3>
-                <p>${googleUser.email}</p>
-            `;
-
-            // Load unclaimed employees
-            try {
-                console.log('Fetching unclaimed employees...');
-                const employees = await getUnclaimedEmployees();
-                console.log('Unclaimed employees:', employees.length);
-
-                if (employees.length === 0) {
-                    showError('No available employee profiles. Please contact administrator.');
-                    return;
-                }
-
-                // Store employees for search
-                allEmployees = employees;
-
-                // Hide Google sign-in, show employee selection
-                document.getElementById('googleSignInContainer').style.display = 'none';
-                document.getElementById('employeeSelection').classList.add('show');
-
-                // Reset to method selection view
-                document.getElementById('searchMethodSelection').style.display = 'flex';
-                document.getElementById('searchInputSection').style.display = 'none';
-                document.getElementById('confirmBtn').style.display = 'none';
-
-            } catch (error) {
-                console.error('Error in showEmployeeSelection:', error);
-                showError('Error loading employee list: ' + (error.message || 'Unknown error'));
-            }
-        }
-
-
-        // Confirm employee selection
-        async function confirmSelection() {
-            const confirmBtn = document.getElementById('confirmBtn');
-
-            if (!selectedEmployee || !pendingGoogleUser) {
-                showError('Please select an employee from the search results.');
-                return;
-            }
-
-            const selectedEmployeeId = selectedEmployee.id;
-
-            hideError();
-            confirmBtn.classList.add('loading');
-            confirmBtn.textContent = 'Saving';
-
-            try {
-                // Claim the employee profile
-                const employee = await claimEmployeeProfile(selectedEmployeeId, pendingGoogleUser.email);
-
-                // Save to localStorage with full hierarchy
-                const userData = {
-                    id: employee.id,
-                    employee_name: employee.employee_name,
-                    employee_id: employee.employee_id,
-                    email: employee.email,
-                    role: employee.role,
-                    mobile: employee.mobile,
-                    picture: pendingGoogleUser.picture,
-                    branch: employee.branch ? {
-                        id: employee.branch.id,
-                        name: employee.branch.name,
-                        district: employee.branch.district ? {
-                            id: employee.branch.district.id,
-                            name: employee.branch.district.name,
-                            region: employee.branch.district.region ? {
-                                id: employee.branch.district.region.id,
-                                name: employee.branch.district.region.name
-                            } : null
-                        } : null
-                    } : null
-                };
-                localStorage.setItem('employeeUser', JSON.stringify(userData));
-
-                // Show success and redirect
-                showSuccessAndRedirect(userData);
-
-            } catch (error) {
-                confirmBtn.classList.remove('loading');
-                confirmBtn.textContent = 'Confirm Selection';
-                showError('Error saving profile. Please try again.');
-            }
-        }
-
-        // Show success message and redirect
-        function showSuccessAndRedirect(userData) {
-            const successMessage = document.getElementById('successMessage');
-            successMessage.innerHTML = `
-                <div class="user-info">
-                    ${userData.picture ? `<img src="${userData.picture}" alt="Profile" onerror="this.style.display='none'">` : ''}
-                    <h3>Welcome, ${userData.employee_name}!</h3>
-                    <p>${userData.employee_id}</p>
-                </div>
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:60px;height:60px;color:#10b981;">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <h2>Login Successful!</h2>
-            `;
-
-            document.getElementById('loginForm').style.display = 'none';
-            successMessage.style.display = 'block';
-
-            // Redirect to reports page
-            setTimeout(() => {
-                window.location.href = 'dashboard.html';
-            }, 2000);
-        }
-
-        // Google Sign-In callback - must be in global scope
-        window.handleGoogleSignIn = async function(response) {
-            console.log('handleGoogleSignIn called!', response);
-
-            try {
-                const payload = decodeJwtPayload(response.credential);
-                console.log('Google Sign-In successful:', payload);
-
-                hideError();
-
-                const googleUser = {
-                    email: payload.email,
-                    name: payload.name,
-                    picture: payload.picture
-                };
-
-                // Check if this email is already registered
-                console.log('Checking if email exists in database...');
-                const employee = await checkEmployeeByEmail(googleUser.email);
-                console.log('Employee check result:', employee);
-
-                if (employee) {
-                    // Email found - user already registered, go straight to profile
-                    console.log('Existing employee found:', employee);
-
-                    const userData = {
-                        id: employee.id,
-                        employee_name: employee.employee_name,
-                        employee_id: employee.employee_id,
-                        email: employee.email,
-                        role: employee.role,
-                        mobile: employee.mobile,
-                        picture: googleUser.picture,
-                        branch: employee.branch ? {
-                            id: employee.branch.id,
-                            name: employee.branch.name,
-                            district: employee.branch.district ? {
-                                id: employee.branch.district.id,
-                                name: employee.branch.district.name,
-                                region: employee.branch.district.region ? {
-                                    id: employee.branch.district.region.id,
-                                    name: employee.branch.district.region.name
-                                } : null
-                            } : null
-                        } : null
-                    };
-                    localStorage.setItem('employeeUser', JSON.stringify(userData));
-
-                    showSuccessAndRedirect(userData);
-
-                } else {
-                    // Email not found - show dropdown to select employee profile
-                    console.log('New user, showing employee selection');
-                    await showEmployeeSelection(googleUser);
-                }
-
-            } catch (error) {
-                console.error('Error during sign-in:', error);
-                showError('Error: ' + (error.message || 'Could not connect to database. Please try again.'));
-            }
-        }
-
-        // Check if user is already logged in on page load
-        document.addEventListener('DOMContentLoaded', async function() {
-            const storedUser = localStorage.getItem('employeeUser');
-            if (storedUser) {
-                try {
-                    const userData = JSON.parse(storedUser);
-                    const employee = await checkEmployeeByEmail(userData.email);
-                    if (employee) {
-                        window.location.href = 'dashboard.html';
-                    } else {
-                        localStorage.removeItem('employeeUser');
-                    }
-                } catch (error) {
-                    console.error('Session verification failed:', error);
-                    localStorage.removeItem('employeeUser');
-                }
-            }
-        });
-    </script>
 </body>
 </html>
