@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Meeting Minutes</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
@@ -14,107 +15,124 @@
 </head>
 <body>
 
-  <!-- Supabase Connection Banner -->
-  <div id="connection-banner" class="connection-banner">
-    <div class="connection-inner">
-      <span class="connection-label">Supabase</span>
-      <input type="text" id="supabase-url" placeholder="Project URL" class="connection-input" value="https://tndwzftilgkhzxseiszj.supabase.co">
-      <input type="text" id="supabase-key" placeholder="Anon Key" class="connection-input connection-input--key" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHd6ZnRpbGdraHp4c2Vpc3pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyMjcwOTIsImV4cCI6MjA4NDgwMzA5Mn0.AZC2RWDl-Pq43AWRD5UE-C_uR9ada3hcC2xWr5ix5ao">
-      <button id="connect-btn" class="btn btn--connect">Connect</button>
-      <span id="connection-status" class="connection-status">Not connected</span>
-      <div class="connection-spacer"></div>
-      <!-- Auth Section -->
-      <div id="auth-section" class="auth-section" style="display:none;">
-        <button id="google-login-btn" class="btn btn--google">
-          <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.6 33.4 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.7 29.2 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.2-2.7-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.5 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.7 29.2 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5 0 9.6-1.6 13.2-4.4l-6.1-5.2C29 36 26.6 36.8 24 36.8c-5.2 0-9.6-3.4-11.2-8l-6.5 5C9.5 40 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.1 5.2C36.6 39.4 44 34 44 24c0-1.3-.2-2.7-.4-3.9z"/></svg>
-          Sign in with Google
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button id="sidebar-toggle" class="topbar-menu-btn" aria-label="Toggle sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="topbar-brand">
+        <svg class="topbar-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span class="topbar-title">Meeting Minutes</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <!-- Auth: Login state -->
+      <div id="auth-section" class="auth-section">
+        <button id="google-login-btn" class="btn-google">
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.6 33.4 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.7 29.2 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.2-2.7-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.5 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.7 29.2 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5 0 9.6-1.6 13.2-4.4l-6.1-5.2C29 36 26.6 36.8 24 36.8c-5.2 0-9.6-3.4-11.2-8l-6.5 5C9.5 40 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.1 5.2C36.6 39.4 44 34 44 24c0-1.3-.2-2.7-.4-3.9z"/></svg>
+          Sign in
         </button>
         <div id="user-profile" class="user-profile" style="display:none;">
-          <img id="user-avatar" class="user-avatar" src="" alt="avatar">
-          <span id="user-name" class="user-name"></span>
-          <button id="my-dashboard-btn" class="btn btn--ghost btn--sm">My Tasks</button>
-          <button id="logout-btn" class="btn btn--outline btn--sm">Logout</button>
+          <button id="my-dashboard-btn" class="topbar-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Dashboard
+          </button>
+          <div class="user-pill">
+            <img id="user-avatar" class="user-avatar" src="" alt="">
+            <span id="user-name" class="user-name"></span>
+          </div>
+          <button id="logout-btn" class="topbar-link topbar-link--muted">Logout</button>
         </div>
       </div>
     </div>
-  </div>
+  </header>
 
   <div class="app-layout">
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <h1 class="logo">
-          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          Minutes
-        </h1>
-        <button id="new-meeting-btn" class="btn btn--primary btn--new-meeting">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <div class="sidebar-top">
+        <button id="new-meeting-btn" class="btn-new-meeting">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           New Meeting
         </button>
-      </div>
-      <div class="sidebar-search">
-        <input type="text" id="search-meetings" placeholder="Search meetings..." class="search-input">
+        <div class="sidebar-search">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-meetings" placeholder="Search..." class="search-input">
+        </div>
       </div>
       <nav class="meetings-nav">
         <ul id="meetings-list" class="meetings-list">
-          <li class="meetings-list__empty">Connect to Supabase to get started.</li>
+          <li class="meetings-list__empty">Loading meetings...</li>
         </ul>
       </nav>
     </aside>
 
     <!-- Main Content -->
     <main class="main-content">
-      <!-- Empty State -->
-      <div id="empty-state" class="empty-state">
-        <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        <h2>No meeting selected</h2>
-        <p>Select a meeting from the sidebar or create a new one.</p>
+      <!-- Login Gate -->
+      <div id="login-gate" class="login-gate" style="display:none;">
+        <div class="login-card">
+          <svg class="login-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <h2>Meeting Minutes</h2>
+          <p>Sign in to create and manage your meeting notes, track decisions, and assign action items.</p>
+          <button id="login-gate-btn" class="btn-google btn-google--lg">
+            <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.6 33.4 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.7 29.2 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.2-2.7-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.5 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 5.7 29.2 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5 0 9.6-1.6 13.2-4.4l-6.1-5.2C29 36 26.6 36.8 24 36.8c-5.2 0-9.6-3.4-11.2-8l-6.5 5C9.5 40 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.1 5.2C36.6 39.4 44 34 44 24c0-1.3-.2-2.7-.4-3.9z"/></svg>
+            Continue with Google
+          </button>
+        </div>
       </div>
 
-      <!-- Current Meeting View (dynamically rendered by JS) -->
+      <!-- Empty State -->
+      <div id="empty-state" class="empty-state" style="display:none;">
+        <div class="empty-state-inner">
+          <div class="empty-state-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <h2>No meeting selected</h2>
+          <p>Pick one from the sidebar or create a new one.</p>
+        </div>
+      </div>
+
+      <!-- Current Meeting View -->
       <div id="current-meeting" class="meeting-view" style="display:none;"></div>
 
-      <!-- My Dashboard View -->
+      <!-- Dashboard View -->
       <div id="dashboard-view" class="dashboard-view" style="display:none;"></div>
     </main>
   </div>
 
-  <!-- New Meeting Modal Overlay -->
+  <!-- New Meeting Modal -->
   <div id="meeting-modal-overlay" class="modal-overlay" style="display:none;">
     <div class="modal">
       <div class="modal-header">
         <h2>New Meeting</h2>
-        <button id="modal-close-btn" class="btn-icon" aria-label="Close">
+        <button id="modal-close-btn" class="btn-close" aria-label="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
       <form id="meeting-form" class="modal-form" autocomplete="off">
         <div class="form-group">
-          <label for="meeting-title" class="field-label">Meeting Title</label>
-          <input type="text" id="meeting-title" class="field-input field-input--full" placeholder="e.g. Sprint Planning" required>
+          <label for="meeting-title" class="form-label">Title</label>
+          <input type="text" id="meeting-title" class="form-input" placeholder="e.g. Sprint Planning" required>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label for="meeting-date" class="field-label">Date</label>
-            <input type="date" id="meeting-date" class="field-input" required>
+            <label for="meeting-date" class="form-label">Date</label>
+            <input type="date" id="meeting-date" class="form-input" required>
           </div>
           <div class="form-group form-group--grow">
-            <label for="meeting-attendees" class="field-label">Attendees</label>
-            <input type="text" id="meeting-attendees" class="field-input field-input--full" placeholder="Alice, Bob, Carol">
+            <label for="meeting-attendees" class="form-label">Attendees</label>
+            <input type="text" id="meeting-attendees" class="form-input" placeholder="Alice, Bob, Carol">
           </div>
         </div>
-        <div class="modal-actions">
-          <button type="button" id="modal-cancel-btn" class="btn btn--outline">Cancel</button>
+        <div class="modal-footer">
+          <button type="button" id="modal-cancel-btn" class="btn btn--secondary">Cancel</button>
           <button type="submit" class="btn btn--primary">Create Meeting</button>
         </div>
       </form>
     </div>
   </div>
-
-  <!-- Mobile Sidebar Toggle -->
-  <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-  </button>
 
 </body>
 </html>
