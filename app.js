@@ -11,6 +11,18 @@
   var currentMeeting = null;
   var currentUser = null;
   var allMeetings = [];
+  var currentDept = null;
+
+  var DEPARTMENTS = ['HR','Training','Audit','Ops','IT and Admin','NMSPL'];
+
+  var DEPT_AGENDAS = {
+    'HR': ['Employee grievances','Recruitment updates','Policy changes','Training needs','Attendance review'],
+    'Training': ['Training calendar review','Skill gap analysis','Feedback from recent trainings','Upcoming programs','Budget utilization'],
+    'Audit': ['Audit findings review','Compliance status','Corrective actions follow-up','Risk assessment','Upcoming audits'],
+    'Ops': ['Production targets review','Quality metrics','Safety incidents','Resource allocation','Process improvements'],
+    'IT and Admin': ['Infrastructure updates','Security patches','Helpdesk ticket review','Asset management','Facility maintenance'],
+    'NMSPL': ['Business development updates','Client feedback','Revenue review','Project status','Strategic initiatives']
+  };
 
   // ---- Speech Recognition State ----
   var recognition = null;
@@ -41,6 +53,41 @@
     setTimeout(function(){ t.classList.remove('show'); setTimeout(function(){ t.remove(); },300); },2500);
   }
 
+  // ---- Department Modal ----
+  function showDeptModal() {
+    var existing = $('#dept-modal-overlay');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.id = 'dept-modal-overlay';
+    overlay.className = 'dept-modal-overlay';
+    var h = '<div class="dept-modal">';
+    h += '<div class="dept-modal-title">Select Your Department</div>';
+    h += '<div class="dept-modal-subtitle">Choose your department to view and manage meetings</div>';
+    h += '<div class="dept-grid">';
+    DEPARTMENTS.forEach(function(d) {
+      h += '<div class="dept-card" onclick="window.__selectDept(\'' + d.replace(/'/g,"\\'") + '\')"><div class="dept-card-name">' + esc(d) + '</div></div>';
+    });
+    h += '<div class="dept-card dept-card--authority" onclick="window.__selectDept(\'Higher Authority\')"><div class="dept-card-name">Higher Authority</div><div class="dept-card-desc">Access all departments</div></div>';
+    h += '</div></div>';
+    overlay.innerHTML = h;
+    document.body.appendChild(overlay);
+  }
+
+  function selectDept(dept) {
+    currentDept = dept;
+    localStorage.setItem('meeting_dept', dept);
+    var overlay = $('#dept-modal-overlay');
+    if (overlay) overlay.remove();
+    updateAuthUI();
+    refreshList();
+    toast('Department set to ' + dept, 'success');
+  }
+  window.__selectDept = selectDept;
+
+  function changeDept() {
+    showDeptModal();
+  }
+
   // ---- Views ----
   function showView(v) {
     var views = { login:'login-gate', empty:'empty-state', meeting:'current-meeting', dashboard:'dashboard-view' };
@@ -61,6 +108,7 @@
     if (!sb) return;
     await sb.auth.signOut();
     currentUser = null;
+    currentDept = null;
     updateAuthUI();
     showView('login');
     toast('Signed out.','success');
@@ -81,14 +129,36 @@
     var nm = $('#user-name');
     if (av) av.src = m.avatar_url || m.picture || '';
     if (nm) nm.textContent = m.full_name || m.name || currentUser.email || '';
+
+    // Department badge
+    var pill = nm ? nm.parentElement : null;
+    if (pill) {
+      var oldBadge = pill.querySelector('.dept-badge');
+      if (oldBadge) oldBadge.remove();
+      var oldBtn = pill.querySelector('.dept-change-btn');
+      if (oldBtn) oldBtn.remove();
+      if (currentDept) {
+        var badge = document.createElement('span');
+        badge.className = 'dept-badge' + (currentDept === 'Higher Authority' ? ' dept-badge--authority' : '');
+        badge.textContent = currentDept;
+        pill.appendChild(badge);
+        var chBtn = document.createElement('button');
+        chBtn.className = 'dept-change-btn';
+        chBtn.textContent = 'Change';
+        chBtn.onclick = function(e) { e.stopPropagation(); changeDept(); };
+        pill.appendChild(chBtn);
+      }
+    }
   }
 
   function userName() { var m = (currentUser||{}).user_metadata||{}; return m.full_name||m.name||(currentUser||{}).email||''; }
   function userEmail() { return (currentUser||{}).email||''; }
 
   // ---- CRUD ----
-  async function createMeeting(title, date, attendees) {
-    var rec = { meeting_id:genId(), title:title, date:date, attendees:attendees, points_discussed:[], decisions:[], action_items:[], user_id:currentUser?currentUser.id:null };
+  async function createMeeting(title, date, attendees, department) {
+    var dept = department || currentDept || '';
+    var points = DEPT_AGENDAS[dept] ? DEPT_AGENDAS[dept].slice() : [];
+    var rec = { meeting_id:genId(), title:title, date:date, attendees:attendees, points_discussed:points, decisions:[], action_items:[], user_id:currentUser?currentUser.id:null, department:dept };
     var r = await sb.from(TABLE).insert([rec]).select().single();
     if (r.error) { toast('Error: '+r.error.message,'error'); return null; }
     toast('Meeting created!','success');
@@ -140,15 +210,29 @@
   function schedSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(collectAndSave,1500); }
 
   // ---- Sidebar ----
+  function getFilteredMeetings(meetings) {
+    if (!currentDept || currentDept === 'Higher Authority') return meetings;
+    return meetings.filter(function(m) { return m.department === currentDept; });
+  }
+
   function renderList(meetings) {
     var ul=$('#meetings-list'); if(!ul) return;
     ul.innerHTML='';
-    if(!meetings.length){ ul.innerHTML='<li class="meetings-list__empty">No meetings yet</li>'; return; }
-    meetings.forEach(function(m){
+    var filtered = getFilteredMeetings(meetings);
+    if(!filtered.length){ ul.innerHTML='<li class="meetings-list__empty">No meetings yet</li>'; return; }
+    filtered.forEach(function(m){
       var li=document.createElement('li');
       li.className='meeting-item'+(currentMeeting&&currentMeeting.id===m.id?' active':'');
       li.dataset.id=m.id;
-      li.innerHTML='<div class="meeting-item-title">'+esc(m.title)+'</div><div class="meeting-item-meta">'+esc(m.meeting_id)+' &middot; '+esc(m.date)+'</div>';
+      var deptCls = '';
+      if(m.department) {
+        var dk = m.department.toLowerCase().replace(/\s+/g,'-');
+        if(dk==='it-and-admin') deptCls='meeting-item-dept--it';
+        else if(dk==='higher-authority') deptCls='meeting-item-dept--authority';
+        else deptCls='meeting-item-dept--'+dk;
+      }
+      var deptBadge = m.department ? '<span class="meeting-item-dept '+deptCls+'">'+esc(m.department)+'</span>' : '';
+      li.innerHTML='<div class="meeting-item-title">'+esc(m.title)+deptBadge+'</div><div class="meeting-item-meta">'+esc(m.meeting_id)+' &middot; '+esc(m.date)+'</div>';
       li.addEventListener('click',function(){ openMeeting(m.id); });
       ul.appendChild(li);
     });
@@ -695,10 +779,66 @@
   }
 
   // ---- Modal ----
+  function suggestMeetingTitle() {
+    var deptSel = $('#meeting-department');
+    var dateInput = $('#meeting-date');
+    var titleInput = $('#meeting-title');
+    if (!deptSel || !dateInput || !titleInput) return;
+    var dept = deptSel.value;
+    var dateVal = dateInput.value;
+    if (dept && dateVal) {
+      var d = new Date(dateVal + 'T00:00:00');
+      var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      var monthYear = monthNames[d.getMonth()] + ' ' + d.getFullYear();
+      titleInput.value = dept + ' Meeting - ' + monthYear;
+    }
+  }
+
   function openModal(){
     var o=$('#meeting-modal-overlay'); if(o) o.style.display='flex';
-    var d=$('#meeting-date'); if(d) d.value=new Date().toISOString().slice(0,10);
-    var t=$('#meeting-title'); if(t){t.value='';t.focus();}
+
+    // Inject department dropdown before the title field if not already present
+    var form = $('#meeting-form');
+    var existingDeptGroup = $('#meeting-dept-group');
+    if (!existingDeptGroup && form) {
+      var firstGroup = form.querySelector('.form-group');
+      var deptGroup = document.createElement('div');
+      deptGroup.className = 'form-group';
+      deptGroup.id = 'meeting-dept-group';
+      var lbl = document.createElement('label');
+      lbl.setAttribute('for', 'meeting-department');
+      lbl.className = 'form-label';
+      lbl.textContent = 'Department';
+      var sel = document.createElement('select');
+      sel.id = 'meeting-department';
+      sel.className = 'form-input form-select';
+      sel.required = true;
+      DEPARTMENTS.forEach(function(dept) {
+        var opt = document.createElement('option');
+        opt.value = dept;
+        opt.textContent = dept;
+        sel.appendChild(opt);
+      });
+      sel.onchange = suggestMeetingTitle;
+      deptGroup.appendChild(lbl);
+      deptGroup.appendChild(sel);
+      form.insertBefore(deptGroup, firstGroup);
+    }
+
+    var deptSel = $('#meeting-department');
+    if (deptSel) {
+      if (currentDept && currentDept !== 'Higher Authority') {
+        deptSel.value = currentDept;
+        deptSel.disabled = true;
+      } else if (currentDept === 'Higher Authority') {
+        deptSel.value = DEPARTMENTS[0];
+        deptSel.disabled = false;
+      }
+    }
+
+    var d=$('#meeting-date'); if(d) { d.value=new Date().toISOString().slice(0,10); d.onchange=suggestMeetingTitle; }
+    suggestMeetingTitle();
+    var t=$('#meeting-title'); if(t) t.focus();
     var a=$('#meeting-attendees'); if(a) a.value=currentUser?userName():'';
   }
   function closeModal(){ var o=$('#meeting-modal-overlay'); if(o) o.style.display='none'; }
@@ -720,10 +860,26 @@
     var fm=$('#meeting-form');
     if(fm) fm.onsubmit=async function(e){
       e.preventDefault();
+      var dept=($('#meeting-department')||{}).value||'';
       var t=($('#meeting-title')||{}).value||'', d=($('#meeting-date')||{}).value||'', a=($('#meeting-attendees')||{}).value||'';
       if(!t.trim()){toast('Enter a title','error');return;}
+      // Check for duplicate department+month
+      if(dept && d) {
+        var dateObj = new Date(d + 'T00:00:00');
+        var ym = dateObj.getFullYear() + '-' + String(dateObj.getMonth()+1).padStart(2,'0');
+        var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        var monthYear = monthNames[dateObj.getMonth()] + ' ' + dateObj.getFullYear();
+        var dup = allMeetings.some(function(mtg) {
+          if (mtg.department !== dept) return false;
+          if (!mtg.date) return false;
+          var md = new Date(mtg.date + 'T00:00:00');
+          var mym = md.getFullYear() + '-' + String(md.getMonth()+1).padStart(2,'0');
+          return mym === ym;
+        });
+        if (dup) { toast('A meeting already exists for ' + dept + ' in ' + monthYear, 'error'); return; }
+      }
       var att=a.split(',').map(function(s){return s.trim();}).filter(Boolean);
-      var m=await createMeeting(t.trim(),d,att);
+      var m=await createMeeting(t.trim(),d,att,dept);
       if(m){ currentMeeting=m; renderMeeting(m); await refreshList(); closeModal(); }
     };
 
@@ -750,7 +906,15 @@
     var sess = await sb.auth.getSession();
     if(sess.data && sess.data.session){
       var u = await sb.auth.getUser();
-      if(u.data && u.data.user){ currentUser=u.data.user; updateAuthUI(); await refreshList(); showView('empty'); }
+      if(u.data && u.data.user){
+        currentUser=u.data.user;
+        var storedDept = localStorage.getItem('meeting_dept');
+        if (storedDept) { currentDept = storedDept; }
+        updateAuthUI();
+        await refreshList();
+        showView('empty');
+        if (!currentDept) { showDeptModal(); }
+      }
       else showView('login');
     } else {
       showView('login');
@@ -760,9 +924,17 @@
     sb.auth.onAuthStateChange(async function(ev,session){
       if(ev==='SIGNED_IN'&&session){
         var u=await sb.auth.getUser();
-        if(u.data&&u.data.user){ currentUser=u.data.user; updateAuthUI(); await refreshList(); showView('empty'); }
+        if(u.data&&u.data.user){
+          currentUser=u.data.user;
+          var storedDept = localStorage.getItem('meeting_dept');
+          if (storedDept) { currentDept = storedDept; }
+          updateAuthUI();
+          await refreshList();
+          showView('empty');
+          if (!currentDept) { showDeptModal(); }
+        }
       } else if(ev==='SIGNED_OUT'){
-        currentUser=null; updateAuthUI(); showView('login');
+        currentUser=null; currentDept=null; updateAuthUI(); showView('login');
       }
     });
   });

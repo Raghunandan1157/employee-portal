@@ -835,6 +835,114 @@ body {
 .meetings-nav::-webkit-scrollbar-thumb, .main-content::-webkit-scrollbar-thumb { background:var(--text-4); border-radius:10px; }
 .meetings-nav::-webkit-scrollbar-thumb:hover, .main-content::-webkit-scrollbar-thumb:hover { background:var(--text-3); }
 
+/* ---- Department Selection Modal ---- */
+.dept-modal-overlay {
+  position:fixed; inset:0;
+  background:rgba(15,23,42,.6);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  z-index:600;
+  display:flex; align-items:center; justify-content:center;
+  animation:overlayIn .2s var(--ease);
+}
+.dept-modal {
+  background:var(--surface);
+  border-radius:var(--r-2xl);
+  box-shadow:var(--shadow-xl);
+  max-width:620px; width:90%;
+  padding:36px;
+  animation:modalIn .3s var(--ease-spring);
+  border:1px solid var(--border-subtle);
+}
+.dept-modal-title {
+  font-size:1.35rem; font-weight:800;
+  letter-spacing:-.03em;
+  text-align:center; margin-bottom:8px;
+}
+.dept-modal-subtitle {
+  font-size:.875rem; color:var(--text-2);
+  text-align:center; margin-bottom:28px;
+}
+.dept-grid {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:12px;
+}
+.dept-card {
+  padding:22px 16px;
+  background:var(--surface);
+  border:2px solid var(--border);
+  border-radius:var(--r-lg);
+  text-align:center; cursor:pointer;
+  transition:all .25s var(--ease);
+  position:relative; overflow:hidden;
+}
+.dept-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background:var(--pri-gradient); opacity:0; transition:opacity .2s;
+}
+.dept-card:hover {
+  border-color:rgba(99,102,241,.3);
+  transform:translateY(-3px);
+  box-shadow:var(--shadow-md);
+}
+.dept-card:hover::before { opacity:1; }
+.dept-card-name { font-size:.875rem; font-weight:700; color:var(--text); }
+.dept-card-desc { font-size:.6875rem; color:var(--text-3); margin-top:4px; }
+.dept-card--authority {
+  border-color:rgba(245,158,11,.2);
+  background:linear-gradient(135deg, rgba(245,158,11,.03) 0%, transparent 100%);
+}
+.dept-card--authority::before { background:linear-gradient(135deg, #f59e0b, #d97706); }
+.dept-card--authority:hover {
+  border-color:rgba(245,158,11,.4);
+  box-shadow:0 4px 16px rgba(245,158,11,.1);
+}
+
+/* ---- Department Badge (Topbar) ---- */
+.dept-badge {
+  display:inline-flex;
+  font-size:.625rem; font-weight:700;
+  padding:3px 10px; border-radius:100px;
+  background:var(--pri-light); color:var(--pri);
+  letter-spacing:.03em; text-transform:uppercase;
+  margin-left:6px;
+}
+.dept-badge--authority { background:rgba(245,158,11,.12); color:#d97706; }
+.dept-change-btn {
+  font-size:.625rem; font-weight:600;
+  color:var(--text-3); background:none; border:none;
+  cursor:pointer; padding:2px 6px; margin-left:4px;
+  transition:color .15s;
+}
+.dept-change-btn:hover { color:var(--pri); }
+
+/* ---- Meeting List Department Indicator ---- */
+.meeting-item-dept {
+  font-size:.5625rem; font-weight:700;
+  padding:2px 7px; border-radius:100px;
+  display:inline-block; margin-top:3px;
+  letter-spacing:.03em; text-transform:uppercase;
+}
+.meeting-item-dept--hr { background:rgba(244,63,94,.1); color:#e11d48; }
+.meeting-item-dept--training { background:rgba(59,130,246,.1); color:#2563eb; }
+.meeting-item-dept--audit { background:rgba(249,115,22,.1); color:#ea580c; }
+.meeting-item-dept--ops { background:rgba(16,185,129,.1); color:#059669; }
+.meeting-item-dept--it { background:var(--pri-light); color:var(--pri); }
+.meeting-item-dept--nmspl { background:rgba(20,184,166,.1); color:#0d9488; }
+.meeting-item-dept--authority { background:rgba(245,158,11,.1); color:#d97706; }
+
+/* ---- Form Select Dropdown ---- */
+.form-select {
+  font:.875rem 'Inter',sans-serif; padding:11px 36px 11px 16px;
+  border:1px solid var(--border); border-radius:var(--r-sm);
+  background:var(--surface); color:var(--text); width:100%;
+  transition:all .2s var(--ease);
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 12px center;
+}
+.form-select:focus { outline:none; border-color:var(--pri); box-shadow:0 0 0 3px var(--pri-light); }
+
 /* ---- Responsive ---- */
 @media (max-width:900px) {
   .main-content { padding:24px 20px; }
@@ -844,6 +952,7 @@ body {
   .action-item-row input { border-right:none; border-bottom:1px solid var(--border-2); }
   .form-row { flex-direction:column; }
   .recorder-section { padding:16px 18px; }
+  .dept-grid { grid-template-columns:repeat(2,1fr); }
 }
 @media (max-width:700px) {
   .topbar-menu-btn { display:flex; }
@@ -856,6 +965,10 @@ body {
   .main-content { height:calc(100vh - var(--topbar-h)); padding:20px 16px; }
   .user-name { display:none; }
   .mv-title-input { font-size:1.25rem; }
+}
+@media (max-width:500px) {
+  .dept-grid { grid-template-columns:1fr; }
+  .dept-modal { padding:24px; }
 }
 
 /* ---- Print ---- */
