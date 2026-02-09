@@ -285,18 +285,42 @@
       }
     };
 
+    var retryCount = 0;
+    var maxRetries = 3;
+
     recognition.onerror = function (event) {
       if (event.error === 'no-speech' || event.error === 'aborted') return;
-      toast('Mic error: ' + event.error, 'error');
-      if (event.error === 'not-allowed') {
+      // Stop on fatal errors — don't keep retrying
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        toast('Microphone access denied. Please allow mic permissions.', 'error');
         isRecording = false;
         updateRecorderUI();
+        return;
       }
+      if (event.error === 'network') {
+        retryCount++;
+        if (retryCount >= maxRetries) {
+          toast('Speech recognition unavailable — check your internet connection', 'error');
+          isRecording = false;
+          updateRecorderUI();
+          return;
+        }
+        // Silently retry up to maxRetries times
+        return;
+      }
+      toast('Mic error: ' + event.error, 'error');
+      isRecording = false;
+      updateRecorderUI();
     };
+
+    recognition.onresult = (function(origOnResult) { return function(event) { retryCount = 0; origOnResult(event); }; })(recognition.onresult);
 
     recognition.onend = function () {
       if (isRecording) {
-        try { recognition.start(); } catch (e) { /* already started */ }
+        setTimeout(function() {
+          if (!isRecording) return;
+          try { recognition.start(); } catch (e) { /* already started */ }
+        }, 300);
       }
     };
   }
