@@ -349,6 +349,38 @@ body {
   border-color:rgba(239,68,68,.2);
   box-shadow:var(--shadow), 0 0 20px rgba(239,68,68,.06);
 }
+.recorder-section-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:18px;
+}
+.recorder-section-title {
+  display:flex; align-items:center; gap:10px;
+  font-size:.8125rem; font-weight:700; color:var(--text);
+  text-transform:uppercase; letter-spacing:.04em;
+}
+.recorder-section-title svg { width:18px; height:18px; color:var(--pri); }
+.recorder-tabs { display:flex; gap:4px; background:var(--bg-subtle); padding:3px; border-radius:var(--r-sm); }
+.recorder-tab {
+  padding:7px 16px; border:none; border-radius:var(--r-xs);
+  font:600 .75rem/1 'Inter',sans-serif; color:var(--text-3);
+  background:transparent; cursor:pointer; transition:all .2s var(--ease);
+}
+.recorder-tab:hover { color:var(--text-2); }
+.recorder-tab.active { background:var(--surface); color:var(--pri); box-shadow:var(--shadow-xs); }
+
+.notes-textarea {
+  width:100%; resize:vertical;
+  font:.8125rem/1.7 'Inter',sans-serif; color:var(--text);
+  padding:14px 16px;
+  background:var(--bg-subtle); border:1px solid var(--border);
+  border-radius:var(--r-sm); transition:all .2s var(--ease);
+  min-height:100px;
+}
+.notes-textarea:focus { outline:none; border-color:var(--pri); box-shadow:0 0 0 3px var(--pri-light); background:var(--surface); }
+.notes-textarea::placeholder { color:var(--text-3); }
+.notes-actions { display:flex; align-items:center; gap:8px; margin-top:12px; }
+.mic-note { font-size:.75rem; color:var(--text-3); margin-top:8px; margin-bottom:4px; }
+
 .recorder-controls { display:flex; align-items:center; }
 .recorder-btn {
   display:inline-flex; align-items:center; gap:10px;

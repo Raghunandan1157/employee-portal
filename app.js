@@ -179,18 +179,38 @@
     h+='<div class="mv-meta"><div><strong>Date</strong> <input type="date" id="edit-meeting-date" value="'+escA(m.date||'')+'"></div>';
     h+='<div><strong>Attendees</strong> <input type="text" id="edit-meeting-attendees" value="'+escA(att)+'" placeholder="Alice, Bob" style="min-width:220px;"></div></div>';
 
-    // Recorder
+    // Smart Notes Section
     h+='<div class="recorder-section">';
+    h+='<div class="recorder-section-header">';
+    h+='<div class="recorder-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Smart Notes</div>';
+    h+='<div class="recorder-tabs">';
+    h+='<button type="button" class="recorder-tab active" data-tab="text" id="tab-text">Type Notes</button>';
+    h+='<button type="button" class="recorder-tab" data-tab="mic" id="tab-mic">Use Mic</button>';
+    h+='</div>';
+    h+='</div>';
+
+    // Text input tab (default)
+    h+='<div class="recorder-tab-content" id="tab-content-text">';
+    h+='<textarea id="notes-textarea" class="notes-textarea" rows="5" placeholder="Type or paste your meeting notes here... Then click Analyze to auto-extract key points, decisions, and action items."></textarea>';
+    h+='<div class="notes-actions">';
+    h+='<button type="button" class="btn btn--primary" id="analyze-notes-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Analyze Notes</button>';
+    h+='<button type="button" class="btn btn--ghost btn--sm" id="clear-notes-btn">Clear</button>';
+    h+='</div>';
+    h+='</div>';
+
+    // Mic tab (hidden by default)
+    h+='<div class="recorder-tab-content" id="tab-content-mic" style="display:none;">';
     h+='<div class="recorder-controls">';
     h+='<button type="button" class="recorder-btn" id="recorder-btn">';
     h+='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
-    h+='<span id="recorder-btn-text">Record Meeting</span>';
+    h+='<span id="recorder-btn-text">Start Recording</span>';
     h+='</button>';
     h+='<div class="recording-indicator" id="recording-indicator" style="display:none;">';
     h+='<span class="recording-dot"></span>';
     h+='<span>Recording...</span>';
     h+='</div>';
     h+='</div>';
+    h+='<p class="mic-note">Uses your browser\'s speech-to-text. Works best in Chrome with a stable internet connection.</p>';
     h+='<div class="transcript-panel" id="transcript-panel" style="display:none;">';
     h+='<div class="transcript-header">';
     h+='<span>Live Transcript</span>';
@@ -198,6 +218,9 @@
     h+='</div>';
     h+='<div class="transcript-text" id="transcript-text"></div>';
     h+='</div>';
+    h+='</div>';
+
+    // Extracted items (shared by both tabs)
     h+='<div class="extracted-items" id="extracted-items" style="display:none;">';
     h+='<div id="extracted-points-section" style="display:none;">';
     h+='<div class="extracted-category">Key Points Detected</div>';
@@ -425,6 +448,12 @@
     container.appendChild(card);
   }
 
+  function clearExtracted(){
+    var ei=$('#extracted-items'); if(ei) ei.style.display='none';
+    ['extracted-points','extracted-decisions','extracted-actions'].forEach(function(id){ var el=$('#'+id); if(el) el.innerHTML=''; });
+    ['extracted-points-section','extracted-decisions-section','extracted-actions-section'].forEach(function(id){ var el=$('#'+id); if(el) el.style.display='none'; });
+  }
+
   function addExtractedToMeeting(text, type) {
     if (type === 'point') {
       var l = $('#points-list');
@@ -460,9 +489,45 @@
     var ap=$('#add-point-btn'); if(ap) ap.onclick=function(){ var l=$('#points-list'); if(!l) return; l.insertAdjacentHTML('beforeend',rowHtml('point-input','Discussion point...','',l.querySelectorAll('.list-row').length)); wireRemove(); wireInputs(); l.querySelector('.list-row:last-child .point-input').focus(); };
     var ad=$('#add-decision-btn'); if(ad) ad.onclick=function(){ var l=$('#decisions-list'); if(!l) return; l.insertAdjacentHTML('beforeend',rowHtml('decision-input','Decision...','',l.querySelectorAll('.list-row').length)); wireRemove(); wireInputs(); l.querySelector('.list-row:last-child .decision-input').focus(); };
     var aa=$('#add-action-btn'); if(aa) aa.onclick=function(){ var l=$('#action-items-list'); if(!l) return; l.insertAdjacentHTML('beforeend',actionHtml({},l.querySelectorAll('.action-item-row').length)); wireRemove(); wireInputs(); l.querySelector('.action-item-row:last-child .action-what').focus(); };
-    // Recorder events
+    // Tab switching
+    $$('.recorder-tab').forEach(function(tab){
+      tab.onclick=function(){
+        var target=tab.dataset.tab;
+        $$('.recorder-tab').forEach(function(t){ t.classList.toggle('active',t.dataset.tab===target); });
+        var textContent=$('#tab-content-text'), micContent=$('#tab-content-mic');
+        if(textContent) textContent.style.display=target==='text'?'block':'none';
+        if(micContent) micContent.style.display=target==='mic'?'block':'none';
+      };
+    });
+
+    // Analyze text notes
+    var ab=$('#analyze-notes-btn'); if(ab) ab.onclick=function(){
+      var ta=$('#notes-textarea'); if(!ta||!ta.value.trim()){ toast('Type some notes first','error'); return; }
+      clearExtracted();
+      var text=ta.value.trim();
+      var items=extractItems(text);
+      if(items.length){
+        var ei=$('#extracted-items'); if(ei) ei.style.display='block';
+        items.forEach(function(item){ renderExtractedItem(item.text,item.type); });
+        toast(items.length+' items extracted!','success');
+      } else {
+        toast('No key items detected. Try adding more details.','error');
+      }
+    };
+
+    // Clear notes
+    var cn2=$('#clear-notes-btn'); if(cn2) cn2.onclick=function(){
+      var ta=$('#notes-textarea'); if(ta) ta.value='';
+      clearExtracted();
+    };
+
+    // Recorder events (mic tab)
     var rb=$('#recorder-btn'); if(rb) rb.onclick=toggleRecording;
-    var ct=$('#clear-transcript-btn'); if(ct) ct.onclick=function(){ fullTranscript=''; var tt=$('#transcript-text'); if(tt) tt.innerHTML=''; var ei=$('#extracted-items'); if(ei){ ei.style.display='none'; } var ep=$('#extracted-points'); if(ep) ep.innerHTML=''; var ed=$('#extracted-decisions'); if(ed) ed.innerHTML=''; var ea=$('#extracted-actions'); if(ea) ea.innerHTML=''; var eps=$('#extracted-points-section'); if(eps) eps.style.display='none'; var eds=$('#extracted-decisions-section'); if(eds) eds.style.display='none'; var eas=$('#extracted-actions-section'); if(eas) eas.style.display='none'; };
+    var ct=$('#clear-transcript-btn'); if(ct) ct.onclick=function(){
+      fullTranscript='';
+      var tt=$('#transcript-text'); if(tt) tt.innerHTML='';
+      clearExtracted();
+    };
 
     wireRemove(); wireInputs();
   }
