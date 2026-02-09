@@ -12,6 +12,11 @@
   var currentUser = null;
   var allMeetings = [];
 
+  // ---- Speech Recognition State ----
+  var recognition = null;
+  var isRecording = false;
+  var fullTranscript = '';
+
   // ---- Helpers ----
   function $(s) { return document.querySelector(s); }
   function $$(s) { return document.querySelectorAll(s); }
@@ -174,6 +179,41 @@
     h+='<div class="mv-meta"><div><strong>Date</strong> <input type="date" id="edit-meeting-date" value="'+escA(m.date||'')+'"></div>';
     h+='<div><strong>Attendees</strong> <input type="text" id="edit-meeting-attendees" value="'+escA(att)+'" placeholder="Alice, Bob" style="min-width:220px;"></div></div>';
 
+    // Recorder
+    h+='<div class="recorder-section">';
+    h+='<div class="recorder-controls">';
+    h+='<button type="button" class="recorder-btn" id="recorder-btn">';
+    h+='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+    h+='<span id="recorder-btn-text">Record Meeting</span>';
+    h+='</button>';
+    h+='<div class="recording-indicator" id="recording-indicator" style="display:none;">';
+    h+='<span class="recording-dot"></span>';
+    h+='<span>Recording...</span>';
+    h+='</div>';
+    h+='</div>';
+    h+='<div class="transcript-panel" id="transcript-panel" style="display:none;">';
+    h+='<div class="transcript-header">';
+    h+='<span>Live Transcript</span>';
+    h+='<button type="button" class="btn btn--ghost btn--sm" id="clear-transcript-btn">Clear</button>';
+    h+='</div>';
+    h+='<div class="transcript-text" id="transcript-text"></div>';
+    h+='</div>';
+    h+='<div class="extracted-items" id="extracted-items" style="display:none;">';
+    h+='<div id="extracted-points-section" style="display:none;">';
+    h+='<div class="extracted-category">Key Points Detected</div>';
+    h+='<div id="extracted-points"></div>';
+    h+='</div>';
+    h+='<div id="extracted-decisions-section" style="display:none;">';
+    h+='<div class="extracted-category">Decisions Detected</div>';
+    h+='<div id="extracted-decisions"></div>';
+    h+='</div>';
+    h+='<div id="extracted-actions-section" style="display:none;">';
+    h+='<div class="extracted-category">Action Items Detected</div>';
+    h+='<div id="extracted-actions"></div>';
+    h+='</div>';
+    h+='</div>';
+    h+='</div>';
+
     // Points
     h+='<div class="mv-section"><div class="mv-section-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Points Discussed<span class="mv-section-count">'+pts.length+'</span></div>';
     h+='<div id="points-list">';
@@ -210,6 +250,183 @@
     return '<button type="button" class="btn-remove remove-btn" title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
   }
 
+  // ---- Speech Recognition ----
+  function initSpeechRecognition() {
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      var btn = $('#recorder-btn');
+      if (btn) {
+        btn.disabled = true;
+        var txt = $('#recorder-btn-text');
+        if (txt) txt.textContent = 'Not Supported';
+      }
+      return;
+    }
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = function (event) {
+      var interim = '';
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          fullTranscript += transcript + ' ';
+          processTranscript(transcript.trim());
+        } else {
+          interim += transcript;
+        }
+      }
+      var el = $('#transcript-text');
+      if (el) {
+        el.innerHTML = esc(fullTranscript) + (interim ? '<span style="color:#94a3b8;">' + esc(interim) + '</span>' : '');
+        el.scrollTop = el.scrollHeight;
+      }
+    };
+
+    recognition.onerror = function (event) {
+      if (event.error === 'no-speech' || event.error === 'aborted') return;
+      toast('Mic error: ' + event.error, 'error');
+      if (event.error === 'not-allowed') {
+        isRecording = false;
+        updateRecorderUI();
+      }
+    };
+
+    recognition.onend = function () {
+      if (isRecording) {
+        try { recognition.start(); } catch (e) { /* already started */ }
+      }
+    };
+  }
+
+  function toggleRecording() {
+    if (!recognition) initSpeechRecognition();
+    if (!recognition) return;
+
+    if (isRecording) {
+      isRecording = false;
+      recognition.stop();
+      updateRecorderUI();
+      toast('Recording stopped', 'success');
+    } else {
+      isRecording = true;
+      fullTranscript = '';
+      var tp = $('#transcript-panel');
+      if (tp) tp.style.display = 'block';
+      try {
+        recognition.start();
+      } catch (e) {
+        toast('Could not start recording', 'error');
+        isRecording = false;
+      }
+      updateRecorderUI();
+    }
+  }
+
+  function updateRecorderUI() {
+    var btn = $('#recorder-btn');
+    var txt = $('#recorder-btn-text');
+    var ind = $('#recording-indicator');
+    if (isRecording) {
+      if (btn) btn.classList.add('recording');
+      if (txt) txt.textContent = 'Stop Recording';
+      if (ind) ind.style.display = 'flex';
+    } else {
+      if (btn) btn.classList.remove('recording');
+      if (txt) txt.textContent = 'Record Meeting';
+      if (ind) ind.style.display = 'none';
+    }
+  }
+
+  function processTranscript(transcript) {
+    if (!transcript) return;
+    var items = extractItems(transcript);
+    if (items.length) {
+      var ei = $('#extracted-items');
+      if (ei) ei.style.display = 'block';
+      items.forEach(function (item) {
+        renderExtractedItem(item.text, item.type);
+      });
+    }
+  }
+
+  function extractItems(text) {
+    var items = [];
+    var sentences = text.replace(/([.?!])\s*/g, '$1|').split('|').filter(Boolean);
+
+    var decisionPatterns = /\b(decided|agreed|approved|will go with|decision is|concluded|finalized)\b/i;
+    var actionPatterns = /\b(need to|should|will|assigned to|responsible for|has to|must|deadline|by next|action item|take care of)\b/i;
+    var keyPointPatterns = /\b(important|note that|key point|remember|highlight|keep in mind|noteworthy)\b/i;
+
+    sentences.forEach(function (s) {
+      s = s.trim();
+      if (!s) return;
+      if (decisionPatterns.test(s)) {
+        items.push({ text: s, type: 'decision' });
+      } else if (actionPatterns.test(s)) {
+        items.push({ text: s, type: 'action' });
+      } else if (keyPointPatterns.test(s)) {
+        items.push({ text: s, type: 'point' });
+      } else if (s.split(/\s+/).length > 8) {
+        items.push({ text: s, type: 'point' });
+      }
+    });
+
+    return items;
+  }
+
+  function renderExtractedItem(text, type) {
+    var containerId = type === 'decision' ? 'extracted-decisions' : type === 'action' ? 'extracted-actions' : 'extracted-points';
+    var sectionId = type === 'decision' ? 'extracted-decisions-section' : type === 'action' ? 'extracted-actions-section' : 'extracted-points-section';
+    var container = $('#' + containerId);
+    var section = $('#' + sectionId);
+    if (!container || !section) return;
+    section.style.display = 'block';
+
+    var labels = { point: 'Point', decision: 'Decision', action: 'Action' };
+    var card = document.createElement('div');
+    card.className = 'extracted-card extracted-card--' + type;
+    card.innerHTML = '<div class="extracted-card-text">' + esc(text) + '</div>' +
+      '<button type="button" class="btn btn--sm btn--primary extracted-add-btn" data-type="' + type + '">Add as ' + labels[type] + '</button>';
+
+    card.querySelector('.extracted-add-btn').addEventListener('click', function () {
+      addExtractedToMeeting(text, type);
+      card.style.opacity = '0.5';
+      card.querySelector('.extracted-add-btn').disabled = true;
+      card.querySelector('.extracted-add-btn').textContent = 'Added';
+    });
+
+    container.appendChild(card);
+  }
+
+  function addExtractedToMeeting(text, type) {
+    if (type === 'point') {
+      var l = $('#points-list');
+      if (l) {
+        l.insertAdjacentHTML('beforeend', rowHtml('point-input', 'Discussion point...', text, l.querySelectorAll('.list-row').length));
+        wireRemove(); wireInputs(); schedSave();
+      }
+    } else if (type === 'decision') {
+      var l2 = $('#decisions-list');
+      if (l2) {
+        l2.insertAdjacentHTML('beforeend', rowHtml('decision-input', 'Decision...', text, l2.querySelectorAll('.list-row').length));
+        wireRemove(); wireInputs(); schedSave();
+      }
+    } else if (type === 'action') {
+      var l3 = $('#action-items-list');
+      if (l3) {
+        var who = '';
+        var whoMatch = text.match(/\b(?:assigned to|responsible for)\s+(\w+(?:\s+\w+)?)/i);
+        if (whoMatch) who = whoMatch[1];
+        l3.insertAdjacentHTML('beforeend', actionHtml({ what: text, who: who, deadline: '' }, l3.querySelectorAll('.action-item-row').length));
+        wireRemove(); wireInputs(); schedSave();
+      }
+    }
+    toast('Added to meeting', 'success');
+  }
+
   // ---- Wire meeting events ----
   function wireMeetingEvents(){
     var s=$('#save-meeting-btn'); if(s) s.onclick=function(e){e.preventDefault();collectAndSave();};
@@ -219,6 +436,10 @@
     var ap=$('#add-point-btn'); if(ap) ap.onclick=function(){ var l=$('#points-list'); if(!l) return; l.insertAdjacentHTML('beforeend',rowHtml('point-input','Discussion point...','',l.querySelectorAll('.list-row').length)); wireRemove(); wireInputs(); l.querySelector('.list-row:last-child .point-input').focus(); };
     var ad=$('#add-decision-btn'); if(ad) ad.onclick=function(){ var l=$('#decisions-list'); if(!l) return; l.insertAdjacentHTML('beforeend',rowHtml('decision-input','Decision...','',l.querySelectorAll('.list-row').length)); wireRemove(); wireInputs(); l.querySelector('.list-row:last-child .decision-input').focus(); };
     var aa=$('#add-action-btn'); if(aa) aa.onclick=function(){ var l=$('#action-items-list'); if(!l) return; l.insertAdjacentHTML('beforeend',actionHtml({},l.querySelectorAll('.action-item-row').length)); wireRemove(); wireInputs(); l.querySelector('.action-item-row:last-child .action-what').focus(); };
+    // Recorder events
+    var rb=$('#recorder-btn'); if(rb) rb.onclick=toggleRecording;
+    var ct=$('#clear-transcript-btn'); if(ct) ct.onclick=function(){ fullTranscript=''; var tt=$('#transcript-text'); if(tt) tt.innerHTML=''; var ei=$('#extracted-items'); if(ei){ ei.style.display='none'; } var ep=$('#extracted-points'); if(ep) ep.innerHTML=''; var ed=$('#extracted-decisions'); if(ed) ed.innerHTML=''; var ea=$('#extracted-actions'); if(ea) ea.innerHTML=''; var eps=$('#extracted-points-section'); if(eps) eps.style.display='none'; var eds=$('#extracted-decisions-section'); if(eds) eds.style.display='none'; var eas=$('#extracted-actions-section'); if(eas) eas.style.display='none'; };
+
     wireRemove(); wireInputs();
   }
   function wireRemove(){ $$('#current-meeting .remove-btn').forEach(function(b){ b.onclick=function(){ b.closest('.list-row').remove(); schedSave(); }; }); }
@@ -261,30 +482,123 @@
   function renderDashboard(){
     var el=$('#dashboard-view'); if(!el) return;
     var un=userName(), ue=userEmail();
+    var today=new Date().toISOString().slice(0,10);
+    var threeDays=new Date(Date.now()+3*864e5).toISOString().slice(0,10);
+    var sevenDays=new Date(Date.now()+7*864e5).toISOString().slice(0,10);
+
     var myMeetings=allMeetings.filter(function(m){
       var a=Array.isArray(m.attendees)?m.attendees:[];
       return a.some(function(x){ var l=x.toLowerCase(); return l===ue.toLowerCase()||l===un.toLowerCase()||(un&&l.includes(un.split(' ')[0].toLowerCase())); })||(m.user_id&&currentUser&&m.user_id===currentUser.id);
     });
-    var myActions=[];
-    allMeetings.forEach(function(m){ (m.action_items||[]).forEach(function(a){ if(!a.who) return; var w=a.who.toLowerCase(); if(w===ue.toLowerCase()||w===un.toLowerCase()||(un&&w.includes(un.split(' ')[0].toLowerCase()))) myActions.push({meeting:m,action:a}); }); });
+
+    var myActions=[], allPoints=[], allDecisions=[];
+    allMeetings.forEach(function(m){
+      (m.action_items||[]).forEach(function(a){ if(!a.who) return; var w=a.who.toLowerCase(); if(w===ue.toLowerCase()||w===un.toLowerCase()||(un&&w.includes(un.split(' ')[0].toLowerCase()))) myActions.push({meeting:m,action:a}); });
+      (m.points_discussed||[]).forEach(function(p){ if(p) allPoints.push({meeting:m,text:p}); });
+      (m.decisions||[]).forEach(function(d){ if(d) allDecisions.push({meeting:m,text:d}); });
+    });
     myActions.sort(function(a,b){ return (a.action.deadline||'9999').localeCompare(b.action.deadline||'9999'); });
 
-    var h='<div class="dash-header"><h2>My Dashboard</h2><p>Welcome back, '+esc(un||ue)+'</p></div>';
+    var overdue=myActions.filter(function(e){ return e.action.deadline&&e.action.deadline<today; });
+    var upcoming=myActions.filter(function(e){ return e.action.deadline&&e.action.deadline>=today&&e.action.deadline<=sevenDays; });
+    var totalPoints=0, totalDecisions=0;
+    myMeetings.forEach(function(m){ totalPoints+=(m.points_discussed||[]).length; totalDecisions+=(m.decisions||[]).length; });
 
-    h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>My Action Items ('+myActions.length+')</h3>';
+    var h='';
+
+    // Header
+    h+='<div class="dash-header">';
+    h+='<div class="dash-header-text"><h2>My Dashboard</h2><p>Welcome back, '+esc(un||ue)+'</p></div>';
+    h+='</div>';
+
+    // Stats grid
+    h+='<div class="dash-stats-grid">';
+    h+='<div class="dash-stat-card"><div class="dash-stat-icon dash-stat-icon--pri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+myMeetings.length+'</div><div class="dash-stat-label">Meetings</div></div></div>';
+    h+='<div class="dash-stat-card"><div class="dash-stat-icon dash-stat-icon--amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+myActions.length+'</div><div class="dash-stat-label">Action Items</div></div></div>';
+    h+='<div class="dash-stat-card'+(overdue.length?' dash-stat-card--alert':'')+'"><div class="dash-stat-icon dash-stat-icon--red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+overdue.length+'</div><div class="dash-stat-label">Overdue</div></div></div>';
+    h+='<div class="dash-stat-card"><div class="dash-stat-icon dash-stat-icon--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+totalDecisions+'</div><div class="dash-stat-label">Decisions</div></div></div>';
+    h+='</div>';
+
+    // Overdue + Upcoming (urgent section)
+    if(overdue.length){
+      h+='<div class="dash-section dash-section--urgent"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Overdue Items ('+overdue.length+')</h3>';
+      overdue.forEach(function(e){
+        var a=e.action, m=e.meeting;
+        h+='<div class="dash-card dash-card--overdue"><div class="action-item-card"><div class="action-details"><div class="action-task-text">'+esc(a.what)+'</div><div class="action-from-meeting">From: '+esc(m.title)+'</div></div><span class="deadline-badge overdue">Overdue: '+esc(a.deadline)+'</span></div></div>';
+      });
+      h+='</div>';
+    }
+
+    // Upcoming deadlines
+    if(upcoming.length){
+      h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Due This Week ('+upcoming.length+')</h3>';
+      upcoming.forEach(function(e){
+        var a=e.action, m=e.meeting;
+        var bc=a.deadline<=threeDays?'upcoming':'future';
+        h+='<div class="dash-card"><div class="action-item-card"><div class="action-details"><div class="action-task-text">'+esc(a.what)+'</div><div class="action-from-meeting">From: '+esc(m.title)+'</div></div><span class="deadline-badge '+bc+'">Due: '+esc(a.deadline)+'</span></div></div>';
+      });
+      h+='</div>';
+    }
+
+    // All Action Items
+    h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>All My Action Items ('+myActions.length+')</h3>';
     if(!myActions.length) h+='<p class="empty-dash-msg">No action items assigned to you.</p>';
     else myActions.forEach(function(e){
       var a=e.action, m=e.meeting, bc='future', bt=a.deadline||'No deadline';
-      if(a.deadline){ var td=new Date().toISOString().slice(0,10); if(a.deadline<td){bc='overdue';bt='Overdue: '+a.deadline;} else if(a.deadline<=new Date(Date.now()+3*864e5).toISOString().slice(0,10)){bc='upcoming';bt='Due: '+a.deadline;} else bt='Due: '+a.deadline; }
-      h+='<div class="dash-card"><div class="action-item-card"><div class="action-details"><div class="action-task-text">'+esc(a.what)+'</div><div class="action-from-meeting">From: '+esc(m.title)+' ('+esc(m.meeting_id)+')</div></div><span class="deadline-badge '+bc+'">'+esc(bt)+'</span></div></div>';
+      if(a.deadline){ if(a.deadline<today){bc='overdue';bt='Overdue: '+a.deadline;} else if(a.deadline<=threeDays){bc='upcoming';bt='Due: '+a.deadline;} else bt='Due: '+a.deadline; }
+      h+='<div class="dash-card" data-meeting-id="'+m.id+'"><div class="action-item-card"><div class="action-details"><div class="action-task-text">'+esc(a.what)+'</div><div class="action-from-meeting">From: '+esc(m.title)+' &middot; '+esc(m.meeting_id)+'</div></div><span class="deadline-badge '+bc+'">'+esc(bt)+'</span></div></div>';
     });
     h+='</div>';
 
+    // Key Decisions to Remember
+    if(allDecisions.length){
+      var recentDecs=allDecisions.slice(0,8);
+      h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Key Decisions to Remember ('+allDecisions.length+')</h3>';
+      h+='<div class="dash-notes-grid">';
+      recentDecs.forEach(function(d){
+        h+='<div class="dash-note-card"><div class="dash-note-text">'+esc(d.text)+'</div><div class="dash-note-from">'+esc(d.meeting.title)+' &middot; '+esc(d.meeting.date)+'</div></div>';
+      });
+      h+='</div></div>';
+    }
+
+    // Important Points
+    if(allPoints.length){
+      var recentPts=allPoints.slice(0,8);
+      h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Important Notes ('+allPoints.length+')</h3>';
+      h+='<div class="dash-notes-grid">';
+      recentPts.forEach(function(p){
+        h+='<div class="dash-note-card dash-note-card--point"><div class="dash-note-text">'+esc(p.text)+'</div><div class="dash-note-from">'+esc(p.meeting.title)+' &middot; '+esc(p.meeting.date)+'</div></div>';
+      });
+      h+='</div></div>';
+    }
+
+    // My Meetings
     h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>My Meetings ('+myMeetings.length+')</h3>';
     if(!myMeetings.length) h+='<p class="empty-dash-msg">No meetings found.</p>';
-    else myMeetings.forEach(function(m){
-      h+='<div class="dash-card" data-meeting-id="'+m.id+'"><div class="dash-card-title">'+esc(m.title)+'</div><div class="dash-card-meta">'+esc(m.meeting_id)+' &middot; '+esc(m.date)+' &middot; '+(Array.isArray(m.attendees)?m.attendees.length:0)+' attendees</div></div>';
-    });
+    else {
+      h+='<div class="dash-meetings-grid">';
+      myMeetings.forEach(function(m){
+        var pts=(m.points_discussed||[]).length, decs=(m.decisions||[]).length, acts=(m.action_items||[]).length;
+        h+='<div class="dash-meeting-card" data-meeting-id="'+m.id+'">';
+        h+='<div class="dash-meeting-title">'+esc(m.title)+'</div>';
+        h+='<div class="dash-meeting-id">'+esc(m.meeting_id)+'</div>';
+        h+='<div class="dash-meeting-date">'+esc(m.date)+'</div>';
+        h+='<div class="dash-meeting-stats">';
+        h+='<span class="dash-meeting-stat">'+pts+' points</span>';
+        h+='<span class="dash-meeting-stat">'+decs+' decisions</span>';
+        h+='<span class="dash-meeting-stat">'+acts+' actions</span>';
+        h+='</div>';
+        var att=Array.isArray(m.attendees)?m.attendees:[];
+        if(att.length){
+          h+='<div class="dash-meeting-attendees">';
+          att.slice(0,4).forEach(function(a){ h+='<span class="dash-attendee-chip">'+esc(a)+'</span>'; });
+          if(att.length>4) h+='<span class="dash-attendee-chip dash-attendee-more">+'+String(att.length-4)+'</span>';
+          h+='</div>';
+        }
+        h+='</div>';
+      });
+      h+='</div>';
+    }
     h+='</div>';
 
     el.innerHTML=h; showView('dashboard');
