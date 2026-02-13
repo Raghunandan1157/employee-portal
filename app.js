@@ -240,20 +240,17 @@
       ul.appendChild(li);
     });
   }
-  // Feature 6: Notification badge for overdue items
+  // Feature 6: Notification badge for overdue items (all items, not user-filtered)
   function updateNotificationBadge(){
     var dashBtn=$('#my-dashboard-btn'); if(!dashBtn) return;
     var old=dashBtn.querySelector('.notification-badge'); if(old) old.remove();
     var today=new Date().toISOString().slice(0,10);
-    var un=userName(), ue=userEmail();
     var overdueCount=0;
-    allMeetings.forEach(function(m){
+    var filtered=getFilteredMeetings(allMeetings);
+    filtered.forEach(function(m){
       (m.action_items||[]).forEach(function(a){
-        if(!a.who||a.completed) return;
-        var w=a.who.toLowerCase();
-        if(w===ue.toLowerCase()||w===un.toLowerCase()||(un&&w.includes(un.split(' ')[0].toLowerCase()))){
-          if(a.deadline&&a.deadline<today) overdueCount++;
-        }
+        if(a.completed) return;
+        if(a.deadline&&a.deadline<today) overdueCount++;
       });
     });
     if(overdueCount>0){
@@ -782,141 +779,147 @@
   }
 
   // ---- Dashboard ----
+  var DEPT_COLORS = {
+    'HR':'#6366f1','Training':'#8b5cf6','Audit':'#ef4444',
+    'Ops':'#f59e0b','IT and Admin':'#06b6d4','NMSPL':'#10b981'
+  };
+
   function renderDashboard(){
     var el=$('#dashboard-view'); if(!el) return;
     var un=userName(), ue=userEmail();
     var today=new Date().toISOString().slice(0,10);
-    var threeDays=new Date(Date.now()+3*864e5).toISOString().slice(0,10);
-    var sevenDays=new Date(Date.now()+7*864e5).toISOString().slice(0,10);
 
-    var myMeetings=allMeetings.filter(function(m){
-      var a=Array.isArray(m.attendees)?m.attendees:[];
-      return a.some(function(x){ var l=x.toLowerCase(); return l===ue.toLowerCase()||l===un.toLowerCase()||(un&&l.includes(un.split(' ')[0].toLowerCase())); })||(m.user_id&&currentUser&&m.user_id===currentUser.id);
+    // Show ALL meetings (not filtered by user)
+    var filtered = getFilteredMeetings(allMeetings);
+
+    // Collect ALL actions, decisions, points across all visible meetings
+    var totalActions=[], totalDecisions=0, totalCompleted=0, totalOverdue=0;
+    filtered.forEach(function(m){
+      (m.action_items||[]).forEach(function(a){
+        totalActions.push({meeting:m,action:a});
+        if(a.completed) totalCompleted++;
+        else if(a.deadline&&a.deadline<today) totalOverdue++;
+      });
+      totalDecisions+=(m.decisions||[]).length;
     });
 
-    var myActions=[], allPoints=[], allDecisions=[];
-    allMeetings.forEach(function(m){
-      (m.action_items||[]).forEach(function(a){ if(!a.who) return; var w=a.who.toLowerCase(); if(w===ue.toLowerCase()||w===un.toLowerCase()||(un&&w.includes(un.split(' ')[0].toLowerCase()))) myActions.push({meeting:m,action:a}); });
-      (m.points_discussed||[]).forEach(function(p){ if(p) allPoints.push({meeting:m,text:p}); });
-      (m.decisions||[]).forEach(function(d){ if(d) allDecisions.push({meeting:m,text:d}); });
+    // Group meetings by department
+    var deptMap={};
+    filtered.forEach(function(m){
+      var d=m.department||'General';
+      if(!deptMap[d]) deptMap[d]=[];
+      deptMap[d].push(m);
     });
-    myActions.sort(function(a,b){ return (a.action.deadline||'9999').localeCompare(b.action.deadline||'9999'); });
-
-    var overdue=myActions.filter(function(e){ return e.action.deadline&&e.action.deadline<today; });
-    var upcoming=myActions.filter(function(e){ return e.action.deadline&&e.action.deadline>=today&&e.action.deadline<=sevenDays; });
-    var totalPoints=0, totalDecisions=0;
-    myMeetings.forEach(function(m){ totalPoints+=(m.points_discussed||[]).length; totalDecisions+=(m.decisions||[]).length; });
+    var deptOrder=['HR','Training','IT and Admin','NMSPL','Ops','Audit'];
+    var deptKeys=deptOrder.filter(function(d){return deptMap[d];});
+    Object.keys(deptMap).forEach(function(d){ if(deptKeys.indexOf(d)<0) deptKeys.push(d); });
 
     var h='';
 
     // Header
     h+='<div class="dash-header">';
-    h+='<div class="dash-header-text"><h2>My Dashboard</h2><p>Welcome back, '+esc(un||ue)+'</p></div>';
-    h+='<div class="dash-header-actions"><button id="export-dept-pdf-btn" class="btn btn--secondary">Export Department Report</button></div>';
+    h+='<div class="dash-header-text"><h2>Action Plan Dashboard</h2><p>'+esc(currentDept==='Higher Authority'?'All Departments Overview':currentDept||'All Departments')+'</p></div>';
+    h+='<div class="dash-header-actions"><button id="export-dept-pdf-btn" class="btn btn--secondary">Export Report PDF</button></div>';
     h+='</div>';
 
-    // Stats grid
+    // Stats
     h+='<div class="dash-stats-grid">';
-    h+='<div class="dash-stat-card"><div class="dash-stat-icon dash-stat-icon--pri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+myMeetings.length+'</div><div class="dash-stat-label">Meetings</div></div></div>';
-    h+='<div class="dash-stat-card"><div class="dash-stat-icon dash-stat-icon--amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+myActions.length+'</div><div class="dash-stat-label">Action Items</div></div></div>';
-    h+='<div class="dash-stat-card'+(overdue.length?' dash-stat-card--alert':'')+'"><div class="dash-stat-icon dash-stat-icon--red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+overdue.length+'</div><div class="dash-stat-label">Overdue</div></div></div>';
-    h+='<div class="dash-stat-card"><div class="dash-stat-icon dash-stat-icon--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+totalDecisions+'</div><div class="dash-stat-label">Decisions</div></div></div>';
+    h+='<div class="dash-stat-card"><div class="dash-stat-icon dash-stat-icon--pri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+filtered.length+'</div><div class="dash-stat-label">Meetings</div></div></div>';
+    h+='<div class="dash-stat-card"><div class="dash-stat-icon dash-stat-icon--amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+totalActions.length+'</div><div class="dash-stat-label">Total Actions</div></div></div>';
+    h+='<div class="dash-stat-card'+(totalOverdue?' dash-stat-card--alert':'')+'"><div class="dash-stat-icon dash-stat-icon--red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+totalOverdue+'</div><div class="dash-stat-label">Overdue</div></div></div>';
+    h+='<div class="dash-stat-card"><div class="dash-stat-icon dash-stat-icon--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div class="dash-stat-info"><div class="dash-stat-num">'+totalCompleted+'</div><div class="dash-stat-label">Completed</div></div></div>';
     h+='</div>';
 
-    // Overdue + Upcoming (urgent section)
-    if(overdue.length){
-      h+='<div class="dash-section dash-section--urgent"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Overdue Items ('+overdue.length+')</h3>';
-      overdue.forEach(function(e){
-        var a=e.action, m=e.meeting;
-        h+='<div class="dash-card dash-card--overdue"><div class="action-item-card"><div class="action-details"><div class="action-task-text">'+esc(a.what)+'</div><div class="action-from-meeting">From: '+esc(m.title)+'</div></div><span class="deadline-badge overdue">Overdue: '+esc(a.deadline)+'</span></div></div>';
+    // Department-wise Action Plan sections
+    deptKeys.forEach(function(dept){
+      var meetings=deptMap[dept];
+      var color=DEPT_COLORS[dept]||'#64748b';
+      var deptActions=[], deptDecisions=[], deptPoints=[];
+      meetings.forEach(function(m){
+        (m.action_items||[]).forEach(function(a,idx){ deptActions.push({meeting:m,action:a,idx:idx}); });
+        (m.decisions||[]).forEach(function(d){ if(d) deptDecisions.push(d); });
+        (m.points_discussed||[]).forEach(function(p){ if(p) deptPoints.push(p); });
       });
+      var doneCount=deptActions.filter(function(e){return e.action.completed;}).length;
+      var pendingCount=deptActions.length-doneCount;
+
+      h+='<div class="dash-dept-section" style="border-left:4px solid '+color+';margin-bottom:24px;padding:20px;background:var(--bg-card,#fff);border-radius:10px;">';
+
+      // Dept header
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">';
+      h+='<div style="display:flex;align-items:center;gap:10px;">';
+      h+='<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+color+';"></span>';
+      h+='<h3 style="margin:0;font-size:18px;font-weight:700;">'+esc(dept)+'</h3>';
+      h+='<span style="font-size:12px;padding:2px 10px;border-radius:12px;background:'+color+'22;color:'+color+';font-weight:600;">'+deptActions.length+' actions</span>';
       h+='</div>';
-    }
-
-    // Upcoming deadlines
-    if(upcoming.length){
-      h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Due This Week ('+upcoming.length+')</h3>';
-      upcoming.forEach(function(e){
-        var a=e.action, m=e.meeting;
-        var bc=a.deadline<=threeDays?'upcoming':'future';
-        h+='<div class="dash-card"><div class="action-item-card"><div class="action-details"><div class="action-task-text">'+esc(a.what)+'</div><div class="action-from-meeting">From: '+esc(m.title)+'</div></div><span class="deadline-badge '+bc+'">Due: '+esc(a.deadline)+'</span></div></div>';
-      });
+      h+='<div style="display:flex;gap:12px;font-size:13px;color:var(--text-muted,#64748b);">';
+      if(doneCount) h+='<span style="color:#059669;">'+doneCount+' done</span>';
+      if(pendingCount) h+='<span style="color:'+color+';">'+pendingCount+' pending</span>';
       h+='</div>';
-    }
+      h+='</div>';
 
-    // All Action Items
-    h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>All My Action Items ('+myActions.length+')</h3>';
-    if(!myActions.length) h+='<p class="empty-dash-msg">No action items assigned to you.</p>';
-    else myActions.forEach(function(e,idx){
-      var a=e.action, m=e.meeting, bc='future', bt=a.deadline||'No deadline';
-      if(a.deadline){ if(a.deadline<today){bc='overdue';bt='Overdue: '+a.deadline;} else if(a.deadline<=threeDays){bc='upcoming';bt='Due: '+a.deadline;} else bt='Due: '+a.deadline; }
-      var aIdx=(m.action_items||[]).indexOf(a);
-      var checked=a.completed?'checked':'';
-      var completedCls=a.completed?' action-completed':'';
-      h+='<div class="dash-card'+completedCls+'" data-meeting-id="'+m.id+'"><div class="action-item-card"><input type="checkbox" class="action-check dash-action-cb" data-mid="'+m.id+'" data-aidx="'+aIdx+'" '+checked+' title="Mark complete"><div class="action-details"><div class="action-task-text">'+esc(a.what)+'</div><div class="action-from-meeting">From: '+esc(m.title)+' &middot; '+esc(m.meeting_id)+'</div></div><span class="deadline-badge '+bc+'">'+esc(bt)+'</span></div></div>';
-    });
-    h+='</div>';
+      // Discussion points (compact)
+      if(deptPoints.length){
+        h+='<div style="margin-bottom:14px;">';
+        h+='<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted,#64748b);margin-bottom:6px;">Discussion Points</div>';
+        h+='<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+        deptPoints.forEach(function(p){
+          h+='<span style="font-size:12px;padding:4px 10px;border-radius:6px;background:var(--bg-hover,#f1f5f9);color:var(--text-primary,#334155);">'+esc(p)+'</span>';
+        });
+        h+='</div></div>';
+      }
 
-    // Key Decisions to Remember
-    if(allDecisions.length){
-      var recentDecs=allDecisions.slice(0,8);
-      h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Key Decisions to Remember ('+allDecisions.length+')</h3>';
-      h+='<div class="dash-notes-grid">';
-      recentDecs.forEach(function(d){
-        h+='<div class="dash-note-card"><div class="dash-note-text">'+esc(d.text)+'</div><div class="dash-note-from">'+esc(d.meeting.title)+' &middot; '+esc(d.meeting.date)+'</div></div>';
-      });
-      h+='</div></div>';
-    }
-
-    // Important Points
-    if(allPoints.length){
-      var recentPts=allPoints.slice(0,8);
-      h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Important Notes ('+allPoints.length+')</h3>';
-      h+='<div class="dash-notes-grid">';
-      recentPts.forEach(function(p){
-        h+='<div class="dash-note-card dash-note-card--point"><div class="dash-note-text">'+esc(p.text)+'</div><div class="dash-note-from">'+esc(p.meeting.title)+' &middot; '+esc(p.meeting.date)+'</div></div>';
-      });
-      h+='</div></div>';
-    }
-
-    // My Meetings
-    h+='<div class="dash-section"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>My Meetings ('+myMeetings.length+')</h3>';
-    if(!myMeetings.length) h+='<p class="empty-dash-msg">No meetings found.</p>';
-    else {
-      h+='<div class="dash-meetings-grid">';
-      myMeetings.forEach(function(m){
-        var pts=(m.points_discussed||[]).length, decs=(m.decisions||[]).length, acts=(m.action_items||[]).length;
-        h+='<div class="dash-meeting-card" data-meeting-id="'+m.id+'">';
-        h+='<div class="dash-meeting-title">'+esc(m.title)+'</div>';
-        h+='<div class="dash-meeting-id">'+esc(m.meeting_id)+'</div>';
-        h+='<div class="dash-meeting-date">'+esc(m.date)+'</div>';
-        h+='<div class="dash-meeting-stats">';
-        h+='<span class="dash-meeting-stat">'+pts+' points</span>';
-        h+='<span class="dash-meeting-stat">'+decs+' decisions</span>';
-        h+='<span class="dash-meeting-stat">'+acts+' actions</span>';
-        h+='</div>';
-        var att=Array.isArray(m.attendees)?m.attendees:[];
-        if(att.length){
-          h+='<div class="dash-meeting-attendees">';
-          att.slice(0,4).forEach(function(a){ h+='<span class="dash-attendee-chip">'+esc(a)+'</span>'; });
-          if(att.length>4) h+='<span class="dash-attendee-chip dash-attendee-more">+'+String(att.length-4)+'</span>';
+      // Decisions (compact)
+      if(deptDecisions.length){
+        h+='<div style="margin-bottom:14px;">';
+        h+='<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted,#64748b);margin-bottom:6px;">Key Decisions</div>';
+        deptDecisions.forEach(function(d){
+          h+='<div style="font-size:13px;padding:6px 0;color:var(--text-primary,#334155);border-bottom:1px solid var(--border,#e2e8f0);display:flex;align-items:flex-start;gap:6px;">';
+          h+='<span style="color:'+color+';font-weight:bold;flex-shrink:0;">&#10003;</span> '+esc(d);
           h+='</div>';
-        }
+        });
         h+='</div>';
-      });
-      h+='</div>';
-    }
-    h+='</div>';
+      }
+
+      // Action items table
+      if(deptActions.length){
+        h+='<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted,#64748b);margin-bottom:8px;">Action Plan</div>';
+        h+='<div style="overflow-x:auto;">';
+        h+='<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+        h+='<thead><tr style="border-bottom:2px solid '+color+'33;">';
+        h+='<th style="text-align:left;padding:8px 6px;font-weight:600;width:30px;"></th>';
+        h+='<th style="text-align:left;padding:8px 6px;font-weight:600;">Task</th>';
+        h+='<th style="text-align:left;padding:8px 6px;font-weight:600;white-space:nowrap;">Assigned To</th>';
+        h+='<th style="text-align:left;padding:8px 6px;font-weight:600;white-space:nowrap;">Deadline</th>';
+        h+='<th style="text-align:center;padding:8px 6px;font-weight:600;">Status</th>';
+        h+='</tr></thead><tbody>';
+        deptActions.forEach(function(e,i){
+          var a=e.action, m=e.meeting;
+          var isOverdue=!a.completed&&a.deadline&&a.deadline<today;
+          var rowBg=a.completed?'var(--bg-hover,#f0fdf4)':isOverdue?'#fef2f2':'transparent';
+          var statusBadge=a.completed
+            ?'<span style="padding:2px 8px;border-radius:4px;background:#dcfce7;color:#059669;font-size:11px;font-weight:600;">Done</span>'
+            :isOverdue
+              ?'<span style="padding:2px 8px;border-radius:4px;background:#fecaca;color:#dc2626;font-size:11px;font-weight:600;">Overdue</span>'
+              :'<span style="padding:2px 8px;border-radius:4px;background:#fef3c7;color:#d97706;font-size:11px;font-weight:600;">Pending</span>';
+          h+='<tr style="border-bottom:1px solid var(--border,#e2e8f0);background:'+rowBg+';">';
+          h+='<td style="padding:8px 6px;text-align:center;"><input type="checkbox" class="dash-action-cb" data-mid="'+m.id+'" data-aidx="'+e.idx+'" '+(a.completed?'checked':'')+' title="Mark complete"></td>';
+          h+='<td style="padding:8px 6px;'+(a.completed?'text-decoration:line-through;opacity:0.6;':'')+'">'+esc(a.what)+'</td>';
+          h+='<td style="padding:8px 6px;font-weight:500;white-space:nowrap;">'+esc(a.who||'-')+'</td>';
+          h+='<td style="padding:8px 6px;white-space:nowrap;">'+esc(a.deadline||'No deadline')+'</td>';
+          h+='<td style="padding:8px 6px;text-align:center;">'+statusBadge+'</td>';
+          h+='</tr>';
+        });
+        h+='</tbody></table></div>';
+      }
+
+      h+='</div>'; // close dept section
+    });
 
     el.innerHTML=h; showView('dashboard');
-    // Wire export button
     var expBtn=$('#export-dept-pdf-btn'); if(expBtn) expBtn.onclick=downloadDeptReport;
-    // Wire dashboard action checkboxes
     el.querySelectorAll('.dash-action-cb').forEach(function(cb){
       cb.onclick=function(e){ e.stopPropagation(); toggleDashActionComplete(parseInt(cb.dataset.mid),parseInt(cb.dataset.aidx),cb.checked); };
-    });
-    el.querySelectorAll('[data-meeting-id]').forEach(function(c){
-      if(!c.querySelector('.dash-action-cb')) c.addEventListener('click',function(){ openMeeting(parseInt(c.dataset.meetingId)); });
     });
   }
 
@@ -1069,6 +1072,191 @@
     toast('Department report downloaded','success');
   }
 
+  // ---- Import: 9-Feb-2026 Review Meeting ----
+  async function importReviewMeeting() {
+    if (!sb || !currentUser) { toast('Please log in first', 'error'); return; }
+
+    var date = '2026-02-09';
+    var commonAttendees = [
+      'Nagendra V. Mali', 'Suresh B.K.', 'Nandakishore', 'Veeresh',
+      'Vishwanath', 'Shivakumar', 'Anitha M.L.', 'Sudha',
+      'Naveen', 'Raghunandam', 'Kotragouda', 'Ajjanagouda'
+    ];
+
+    var commonDecisions = [
+      'New partnership with Shriram Finance for Vehicle Loans and Kotak for HL, PL & LAP – implementation, team building, and operational readiness to be planned',
+      'ESAF Lending: 30% Individual Loans (IL) and 70% Group Loans / IGL from next financial year',
+      'Clear process flow, business plan, and operational strategy to be defined for ESAF',
+      'ICICI partnership from April 2026 – Lending through SHG Model, requires branch setup and dedicated teams',
+      'Vivrutti Gold Loan – Preparatory activities to be initiated',
+      'Monthly review meetings to be conducted; departments to prepare and present PPTs',
+      'Each department to conduct in-depth study on one focus area every month and present improvements, strategies, challenges, and implications',
+      'One middle-management level analyst with cross-functional experience to be identified for HR & Training, Operations, Admin & IT, Audit'
+    ];
+
+    var deptData = [
+      {
+        department: 'HR',
+        title: 'HR Review Meeting - February 2026',
+        points_discussed: [
+          'Manpower planning – field & department-wise',
+          'Attrition analysis',
+          'Recruitment status',
+          'Salary projections & manpower plan – Feb 2026',
+          'Employee engagement initiatives: Drawing competition (Republic Day theme), Short video creation for awareness, Branch team contests, Potluck lunch at corporate office, Leader boards'
+        ],
+        decisions: commonDecisions.slice(),
+        action_items: [
+          { who: 'Vishwanath', what: 'Revision of HR & Training Policy', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Maintain department-wise manpower data (HO & CO)', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Add Sr. Manager reporting directly to CEO in organization structure', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Define DOE roles & responsibilities along with Ops Team', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Design Secured Lending Team Structure (Housing Loan & Vehicle Loan) with Designation', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Collect data of old MBL team members (NMSPL/NLPL) – number of accounts handled and plan further action', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Team placement: Mrs. Siddagangamma to HL Team', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Team placement: Mr. Varun to Digital Lending Team', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Team placement: Mrs. Sharadhi from Accounts Team to Ops', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Collect & Analyse employee exit formalities, exit reasons and tracking', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Coordinate with RMs to obtain projected recruitment plan for next year (attrition & recruitment)', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Analyse low performance reasons, plan skip-level meetings', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Bifurcate Full & Final pending details – Salary & TA', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Prepare DRAFT copy of overall incentive structure for all products/entities effective 1st April 2026', deadline: '2026-02-28', completed: false },
+          { who: 'Vishwanath', what: 'Conduct pay-out simulations', deadline: '2026-02-28', completed: false }
+        ]
+      },
+      {
+        department: 'Training',
+        title: 'Training Review Meeting - February 2026',
+        points_discussed: [
+          'Employee engagement initiatives: Drawing competition for employees\' children (Republic Day theme)',
+          'Short video creation for Employee Awareness',
+          'Branch team contests for team motivation',
+          'Potluck lunch at corporate office',
+          'Leader boards for healthy competitions',
+          'Monthly Initiatives – Employee Awareness'
+        ],
+        decisions: commonDecisions.slice(),
+        action_items: [
+          { who: 'Shivakumar', what: 'Prepare Yearly Training Calendar with Budget (designation-wise)', deadline: '2026-02-28', completed: false },
+          { who: 'Shivakumar', what: 'Conduct Knowledge Test / Quiz Competitions for Field Team at District & Regional levels with attractive prizes', deadline: '2026-02-28', completed: false }
+        ]
+      },
+      {
+        department: 'IT and Admin',
+        title: 'IT and Admin Review Meeting - February 2026',
+        points_discussed: [
+          'Branch-wise Admin & IT asset details and asset values',
+          'Office & accommodation buildings',
+          'Printing, stationery & related expenses',
+          'CCTV details',
+          'Major Focus: Asset tracking – computers, laptops, tabs, and other devices'
+        ],
+        decisions: commonDecisions.slice(),
+        action_items: [
+          { who: 'Nandakishore', what: 'Admin & IT team visit branches, coordinate with branch teams, and collect accurate asset data using Trackolap', deadline: '2026-02-28', completed: false }
+        ]
+      },
+      {
+        department: 'NMSPL',
+        title: 'NMSPL Portfolio / Collection Review - February 2026',
+        points_discussed: [
+          'Overall portfolio overview',
+          'Manpower review',
+          'Collection efficiency – Regular, SMA & NPA (branch-wise, account-wise & amount-wise)',
+          'Legal cases and improvement areas',
+          'Feb 2026 action plan',
+          'Introduction of Club Rewards: HR Club, CEO Club & MD Club',
+          'JFM One-Day Trip for individuals and families based on collection performance'
+        ],
+        decisions: commonDecisions.slice(),
+        action_items: [
+          { who: 'Kotragouda', what: 'Revise and present data on NPA activation & closure, Regular collection, fully paid & partially paid customers', deadline: '2026-02-28', completed: false },
+          { who: 'Kotragouda', what: 'Target Rs 2.5 Cr collection from NPA pool', deadline: '2026-02-28', completed: false },
+          { who: 'Kotragouda', what: 'Increase daily demand collection to 99.5%', deadline: '2026-02-28', completed: false },
+          { who: 'Kotragouda', what: 'Implement Leaders board concept in NMSPL', deadline: '2026-02-28', completed: false },
+          { who: 'Kotragouda', what: 'Tele-calling through DOEs for NLPL/NMSPL outstanding at NLPL branch locations', deadline: '2026-02-28', completed: false },
+          { who: 'Kotragouda', what: 'Complete legal hiring in Tamil Nadu', deadline: '2026-02-28', completed: false },
+          { who: 'Kotragouda', what: 'Conduct feasibility study on SHG lending in Mysore Region and branch merging for branches with <500 accounts', deadline: '2026-02-28', completed: false },
+          { who: 'Kotragouda', what: 'Shift the Branch Assets from MP, AP & TS branches', deadline: '2026-02-28', completed: false }
+        ]
+      },
+      {
+        department: 'Ops',
+        title: 'Operations Review Meeting - February 2026',
+        points_discussed: [
+          'Team structure',
+          'Login vs Disbursement',
+          'Digital Collections',
+          'Insurance',
+          'Collection process',
+          'Secured loans'
+        ],
+        decisions: commonDecisions.slice(),
+        action_items: [
+          { who: 'Anitha M.L.', what: 'In-depth Digital payment data analysis', deadline: '2026-02-28', completed: false },
+          { who: 'Anitha M.L.', what: 'Insurance TAT analysis', deadline: '2026-02-28', completed: false },
+          { who: 'Anitha M.L.', what: 'Collection reporting – T+1 basis', deadline: '2026-02-28', completed: false },
+          { who: 'Anitha M.L.', what: 'Secured loan reporting to be product-wise and entity-wise', deadline: '2026-02-28', completed: false }
+        ]
+      },
+      {
+        department: 'Audit',
+        title: 'Audit Review Meeting - February 2026',
+        points_discussed: [
+          'Audit Process review',
+          'Internal Audit team structure and Team Members',
+          'Branch Audit coverage, and sampling Audits',
+          'Fraud cases and related analysis',
+          'Major audit observations, including Ombudsman and grievance-related issues'
+        ],
+        decisions: commonDecisions.slice(),
+        action_items: [
+          { who: 'Veeresh', what: 'Auditors to visit NPA customers who have not been contacted by the branch team', deadline: '2026-02-28', completed: false },
+          { who: 'Veeresh', what: 'Take appropriate disciplinary action on employees involved in fraud who are still active in the system', deadline: '2026-02-28', completed: false },
+          { who: 'Veeresh', what: 'Obtain detailed data on fraud amounts in OD accounts', deadline: '2026-02-28', completed: false },
+          { who: 'Veeresh', what: 'Review the e-stamp paper process', deadline: '2026-02-28', completed: false },
+          { who: 'Veeresh', what: 'Address the fake document uploads', deadline: '2026-02-28', completed: false },
+          { who: 'Veeresh', what: 'Fix Nominee mismatches and incorrect customer name entries', deadline: '2026-02-28', completed: false },
+          { who: 'Veeresh', what: 'Create an Advance Collection Policy', deadline: '2026-02-28', completed: false },
+          { who: 'Veeresh', what: 'Implement and monitor Early Warning Signals (EWS) for risk identification', deadline: '2026-02-28', completed: false }
+        ]
+      }
+    ];
+
+    var created = 0, skipped = 0;
+    for (var i = 0; i < deptData.length; i++) {
+      var dd = deptData[i];
+      // Check for duplicate department+month
+      var dup = allMeetings.some(function(mtg) {
+        if (mtg.department !== dd.department) return false;
+        if (!mtg.date) return false;
+        var md = new Date(mtg.date + 'T00:00:00');
+        return md.getFullYear() === 2026 && md.getMonth() === 1; // Feb 2026
+      });
+      if (dup) { skipped++; continue; }
+
+      var rec = {
+        meeting_id: genId(),
+        title: dd.title,
+        date: date,
+        attendees: commonAttendees,
+        points_discussed: dd.points_discussed,
+        decisions: dd.decisions,
+        action_items: dd.action_items,
+        user_id: currentUser.id,
+        department: dd.department,
+        status: 'draft'
+      };
+      var r = await sb.from(TABLE).insert([rec]).select().single();
+      if (r.error) { toast('Error creating ' + dd.department + ': ' + r.error.message, 'error'); }
+      else { created++; }
+    }
+
+    await refreshList();
+    toast('Imported ' + created + ' meetings' + (skipped ? ' (' + skipped + ' skipped — already exist)' : ''), 'success');
+  }
+  window.importReviewMeeting = importReviewMeeting;
+
   // ---- Init ----
   function wireStatic(){
     // Auth
@@ -1079,6 +1267,8 @@
 
     // New meeting
     var nb=$('#new-meeting-btn'); if(nb) nb.onclick=openModal;
+    // Import review meeting
+    var ib=$('#import-review-btn'); if(ib) ib.onclick=async function(){ if(!confirm('Import the 9-Feb-2026 Review Meeting data for all 6 departments?')) return; ib.disabled=true; ib.textContent='Importing...'; await importReviewMeeting(); ib.disabled=false; ib.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import 9-Feb Review Meeting'; };
     var cb=$('#modal-close-btn'); if(cb) cb.onclick=closeModal;
     var cn=$('#modal-cancel-btn'); if(cn) cn.onclick=closeModal;
     var ov=$('#meeting-modal-overlay'); if(ov) ov.onclick=function(e){ if(e.target===ov) closeModal(); };
